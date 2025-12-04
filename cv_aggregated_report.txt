@@ -1,0 +1,10 @@
+                 precision    recall  f1-score   support
+
+        HER2(+)       0.41      0.32      0.36       397
+      Luminal A       0.39      0.39      0.39       414
+      Luminal B       0.36      0.57      0.44       445
+Triple negative       0.00      0.00      0.00       156
+
+       accuracy                           0.38      1412
+      macro avg       0.29      0.32      0.30      1412
+   weighted avg       0.34      0.38      0.35      1412

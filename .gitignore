@@ -217,6 +217,7 @@ __marimo__/
 
 logs/
 data/
+data_copy/
 checkpoints/
 ## Core latex/pdflatex auxiliary files:
 *.aux

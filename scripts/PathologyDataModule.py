@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import cv2
+import lightning.pytorch as L
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pytorch_lightning as L
 import torch
 from PIL import Image
 from sklearn.model_selection import train_test_split
@@ -31,23 +31,43 @@ from torchvision import transforms
 # Configuration
 # =============================================================================
 class Config:
-    """Configuration for the pathology classification project."""
-
-    NUM_CLASSES = 4
+    # Data paths
+    DATA_DIR = "./data"
+    TRAIN_DATA_DIR = "./data/train_data"
+    TEST_DATA_DIR = "./data/test_data"
+    TRAIN_LABELS_PATH = "./data/train_labels.csv"
+    OUTPUT_PATH = "./predictions.csv"
+    # Class labels
     CLASSES = ["Luminal A", "Luminal B", "HER2(+)", "Triple negative"]
-    LEARNING_RATE = 1e-4
-    WEIGHT_DECAY = 1e-5
-    USE_PATCHES = False
-    BATCH_SIZE = 16
-    NUM_WORKERS = 0
-    IMG_SIZE = 224
-    PATCH_SIZE = 224
-    NUM_PATCHES = 8
+    NUM_CLASSES = 4
 
-    # Data paths - UPDATE THESE TO YOUR ACTUAL PATHS
-    TRAIN_DATA_DIR = "./data/train"
-    TEST_DATA_DIR = "./data/test"
-    LABELS_PATH = "./data/train.csv"
+    # Image settings
+    IMG_SIZE = 512  # Larger size for histopathology
+    USE_MASK = True
+
+    # Tissue detection settings
+    TISSUE_THRESHOLD = 0.8  # Threshold for tissue detection (lower = more sensitive)
+    MIN_TISSUE_AREA = 0.05  # Minimum tissue area ratio
+    PADDING = 50  # Padding around tissue bounding box
+
+    # Patch-based settings (for very large images)
+    USE_PATCHES = True
+    PATCH_SIZE = 224
+    NUM_PATCHES = 8  # Number of patches to sample per image
+
+    # Stain normalization
+    USE_STAIN_NORMALIZATION = False
+
+    # Training settings
+    BATCH_SIZE = 16
+    NUM_WORKERS = 2
+    MAX_EPOCHS = 50
+    LEARNING_RATE = 1e-4
+    WEIGHT_DECAY = 1e-4
+
+    # Validation split
+    VAL_SPLIT = 0.2
+    RANDOM_SEED = 42
 
 
 # =============================================================================
@@ -332,157 +352,221 @@ class PathologyDataset(Dataset):
 # PathologyDataModule
 # =============================================================================
 class PathologyDataModule(L.LightningDataModule):
-    """Lightning DataModule for histopathology image classification."""
+    """Lightning DataModule for histopathology image classification.
+
+    Args:
+        train_data_dir: Directory containing training images and masks.
+        test_data_dir: Directory containing test images and masks.
+        train_labels_path: Path to CSV file with training labels.
+        batch_size: Batch size for dataloaders.
+        num_workers: Number of workers for dataloaders.
+        img_size: Target image size (used when not using patches).
+        use_mask: Whether to use masks for tissue extraction.
+        use_patches: Whether to use patch-based loading.
+        patch_size: Size of patches to extract.
+        num_patches: Number of patches per image.
+        min_tissue_ratio: Minimum tissue ratio for valid patches.
+        use_stain_norm: Whether to apply stain normalization.
+        val_split: Fraction of training data to use for validation.
+        random_seed: Random seed for reproducibility.
+    """
 
     def __init__(
         self,
         train_data_dir: str = Config.TRAIN_DATA_DIR,
         test_data_dir: str = Config.TEST_DATA_DIR,
-        labels_path: str = Config.LABELS_PATH,
+        train_labels_path: str = Config.TRAIN_LABELS_PATH,
+        trash_list_path: str = "data/trash_list.txt",
         batch_size: int = Config.BATCH_SIZE,
         num_workers: int = Config.NUM_WORKERS,
         img_size: int = Config.IMG_SIZE,
+        use_mask: bool = Config.USE_MASK,
         use_patches: bool = Config.USE_PATCHES,
         patch_size: int = Config.PATCH_SIZE,
         num_patches: int = Config.NUM_PATCHES,
-        use_mask: bool = True,
-        use_stain_norm: bool = False,
-        use_augmentation: bool = True,
-        val_split: float = 0.2,
-        random_state: int = 42,
+        min_tissue_ratio: float = Config.MIN_TISSUE_AREA,
+        use_stain_norm: bool = Config.USE_STAIN_NORMALIZATION,
+        val_split: float = Config.VAL_SPLIT,
+        random_seed: int = Config.RANDOM_SEED,
     ):
         super().__init__()
-        self.train_data_dir = Path(train_data_dir)
-        self.test_data_dir = Path(test_data_dir)
-        self.labels_path = labels_path
+        self.save_hyperparameters()
+
+        self.train_data_dir = train_data_dir
+        self.test_data_dir = test_data_dir
+        self.train_labels_path = train_labels_path
+        self.trash_list_path = trash_list_path
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.img_size = img_size
+        self.use_mask = use_mask
         self.use_patches = use_patches
         self.patch_size = patch_size
         self.num_patches = num_patches
-        self.use_mask = use_mask
+        self.min_tissue_ratio = min_tissue_ratio
         self.use_stain_norm = use_stain_norm
-        self.use_augmentation = use_augmentation
         self.val_split = val_split
-        self.random_state = random_state
+        self.random_seed = random_seed
 
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
-        self.label_encoder = None
-
-    def _get_train_transforms(self) -> transforms.Compose:
-        """Get training transforms with augmentation."""
-        transform_list = []
-
-        if not self.use_patches:
-            transform_list.append(transforms.Resize((self.img_size, self.img_size)))
-
-        if self.use_augmentation:
-            transform_list.extend(
-                [
-                    transforms.RandomHorizontalFlip(p=0.5),
-                    transforms.RandomVerticalFlip(p=0.5),
-                    transforms.RandomRotation(degrees=90),
-                ]
-            )
-
-        transform_list.extend(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ]
-        )
-
-        return transforms.Compose(transform_list)
-
-    def _get_val_transforms(self) -> transforms.Compose:
-        """Get validation/test transforms (no augmentation)."""
-        transform_list = []
-
-        if not self.use_patches:
-            transform_list.append(transforms.Resize((self.img_size, self.img_size)))
-
-        transform_list.extend(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ]
-        )
-
-        return transforms.Compose(transform_list)
-
-    def setup(self, stage: Optional[str] = None):
-        """Setup datasets for each stage."""
-        # Create label encoder
+        # Initialize label encoder
         self.label_encoder = LabelEncoder()
         self.label_encoder.fit(Config.CLASSES)
 
-        if stage == "fit" or stage is None:
-            # Load labels
-            labels_df = pd.read_csv(self.labels_path)
+        # Will be set in setup()
+        self.train_df = None
+        self.val_df = None
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
 
-            # Split into train/val with stratification
-            train_df, val_df = train_test_split(
-                labels_df,
+    def _get_train_transforms(self) -> transforms.Compose:
+        """Get augmentation transforms for training."""
+        target_size = self.patch_size if self.use_patches else self.img_size
+        return transforms.Compose(
+            [
+                transforms.Resize((target_size, target_size)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomVerticalFlip(p=0.5),
+                transforms.RandomRotation(degrees=90),
+                transforms.ColorJitter(
+                    brightness=0.2,
+                    contrast=0.2,
+                    saturation=0.1,
+                    hue=0.05,
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225],
+                ),
+            ]
+        )
+
+    def _get_val_transforms(self) -> transforms.Compose:
+        """Get transforms for validation/test (no augmentation)."""
+        target_size = self.patch_size if self.use_patches else self.img_size
+        return transforms.Compose(
+            [
+                transforms.Resize((target_size, target_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225],
+                ),
+            ]
+        )
+
+    def setup(self, stage: Optional[str] = None):
+        """Setup datasets for each stage."""
+        if stage == "fit" or stage is None:
+            # Load and split training data
+            full_df = pd.read_csv(self.train_labels_path)
+
+            # --- TRASH FILTERING START (DEBUG VERSION) ---
+            trash_path = Path(self.trash_list_path)
+            if trash_path.exists():
+                print(f"Loading trash list from {trash_path}...")
+                with open(trash_path, "r") as f:
+                    trash_files = [
+                        line.strip() for line in f.readlines() if line.strip()
+                    ]
+
+                print(f"Total lines in trash_list.txt: {len(trash_files)}")
+
+                # Normalize trash filenames to IDs
+                trash_ids = set()
+                for t_file in trash_files:
+                    clean_id = t_file.replace("img_", "").replace(".png", "")
+                    trash_ids.add(clean_id)
+
+                print(
+                    f"Unique IDs in trash list (after deduplication): {len(trash_ids)}"
+                )
+
+                # Helper to clean DataFrame IDs
+                def clean_df_id(x):
+                    return str(x).replace("img_", "").replace(".png", "")
+
+                # Get all IDs currently in the CSV
+                csv_ids = set(full_df["sample_index"].apply(clean_df_id))
+
+                # Calculate intersection and difference
+                ids_to_remove = trash_ids.intersection(csv_ids)
+                ids_not_found = trash_ids - csv_ids
+
+                print(f"IDs from trash list FOUND in CSV: {len(ids_to_remove)}")
+                print(f"IDs from trash list NOT FOUND in CSV: {len(ids_not_found)}")
+
+                if len(ids_not_found) > 0:
+                    print(f"Example missing IDs: {list(ids_not_found)[:5]}")
+
+                # Apply the filter
+                initial_count = len(full_df)
+                mask = full_df["sample_index"].apply(clean_df_id).isin(trash_ids)
+                full_df = full_df[~mask].reset_index(drop=True)
+
+                dropped_count = initial_count - len(full_df)
+                print(f"Final check: Removed {dropped_count} rows from dataframe.")
+                print(f"Remaining samples: {len(full_df)}")
+            else:
+                print("No trash_list.txt found, skipping filtering.")
+            # --- TRASH FILTERING END ---
+
+            self.train_df, self.val_df = train_test_split(
+                full_df,
                 test_size=self.val_split,
-                stratify=labels_df["label"],
-                random_state=self.random_state,
+                stratify=full_df["label"],
+                random_state=self.random_seed,
             )
 
-            print(f"Train samples: {len(train_df)}")
-            print(f"Val samples: {len(val_df)}")
-            print("Class distribution in train:")
-            print(train_df["label"].value_counts())
-
-            # Create training dataset
+            # Training dataset: random strategy with half overlap
             self.train_dataset = PathologyDataset(
-                data_dir=str(self.train_data_dir),
-                labels_df=train_df,
+                data_dir=self.train_data_dir,
+                labels_df=self.train_df,
                 transform=self._get_train_transforms(),
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
                 num_patches=self.num_patches,
+                patch_strategy="random",  # Random for training
+                min_tissue_ratio=self.min_tissue_ratio,
                 use_stain_norm=self.use_stain_norm,
                 is_test=False,
                 label_encoder=self.label_encoder,
             )
 
-            # Create validation dataset
+            # Validation dataset: grid strategy with no overlap
             self.val_dataset = PathologyDataset(
-                data_dir=str(self.train_data_dir),
-                labels_df=val_df,
+                data_dir=self.train_data_dir,
+                labels_df=self.val_df,
                 transform=self._get_val_transforms(),
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
                 num_patches=self.num_patches,
+                patch_strategy="grid",  # Grid for validation
+                min_tissue_ratio=self.min_tissue_ratio,
                 use_stain_norm=self.use_stain_norm,
                 is_test=False,
                 label_encoder=self.label_encoder,
             )
 
-        if stage == "test" or stage is None:
-            # Create test dataset
+        if stage == "test" or stage == "predict" or stage is None:
+            # Test dataset: grid strategy with no overlap
             self.test_dataset = PathologyDataset(
-                data_dir=str(self.test_data_dir),
+                data_dir=self.test_data_dir,
                 labels_df=None,
                 transform=self._get_val_transforms(),
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
                 num_patches=self.num_patches,
+                patch_strategy="grid",
+                min_tissue_ratio=self.min_tissue_ratio,
                 use_stain_norm=self.use_stain_norm,
                 is_test=True,
                 label_encoder=self.label_encoder,
             )
-            print(f"Test samples: {len(self.test_dataset)}")
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -501,6 +585,7 @@ class PathologyDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
+            drop_last=False,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -510,7 +595,11 @@ class PathologyDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
+            drop_last=False,
         )
+
+    def predict_dataloader(self) -> DataLoader:
+        return self.test_dataloader()
 
 
 # =============================================================================
@@ -613,7 +702,9 @@ def plot_dataset_samples(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Saved figure to {save_path}")
 
-    plt.show()
+    # Quiet, non-blocking draw
+    plt.show(block=False)
+    plt.pause(0.001)
     plt.close()
 
 
@@ -653,7 +744,8 @@ def plot_class_distribution(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Saved figure to {save_path}")
 
-    plt.show()
+    plt.show(block=False)
+    plt.pause(0.001)
     plt.close()
 
 
@@ -704,7 +796,8 @@ def plot_augmentation_comparison(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Saved figure to {save_path}")
 
-    plt.show()
+    plt.show(block=False)
+    plt.pause(0.001)
     plt.close()
 
 
@@ -755,7 +848,8 @@ def plot_batch_grid(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Saved figure to {save_path}")
 
-    plt.show()
+    plt.show(block=False)
+    plt.pause(0.001)
     plt.close()
 
 
@@ -781,14 +875,13 @@ def test_datamodule(
     datamodule = PathologyDataModule(
         train_data_dir=train_data_dir,
         test_data_dir=test_data_dir,
-        labels_path=labels_path,
-        batch_size=8,
-        num_workers=0,
-        img_size=224,
+        train_labels_path=labels_path,
+        batch_size=Config.BATCH_SIZE,
+        num_workers=Config.NUM_WORKERS,
+        img_size=Config.IMG_SIZE,
         use_patches=use_patches,
-        patch_size=224,
-        num_patches=8,
-        use_augmentation=True,
+        patch_size=Config.PATCH_SIZE,
+        num_patches=Config.NUM_PATCHES,
     )
 
     # Setup datasets
@@ -819,6 +912,7 @@ def test_datamodule(
     print(
         f"  Train batch - Images: {train_batch[0].shape}, Labels: {train_batch[1].shape}"
     )
+    print(train_batch[1])
     print(f"  Val batch   - Images: {val_batch[0].shape}, Labels: {val_batch[1].shape}")
     print(f"  Test batch  - Images: {test_batch[0].shape}, IDs: {len(test_batch[1])}")
 

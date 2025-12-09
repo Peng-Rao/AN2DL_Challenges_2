@@ -168,7 +168,7 @@ class TissueExtractor:
         stride: Optional[int] = None,
         shuffle: bool = True,
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        """Grid strategy: systematically slide across the image."""
+        """Grid strategy: systematically slide across the TISSUE REGION only."""
 
         if stride is None:
             stride = self.patch_size
@@ -176,8 +176,25 @@ class TissueExtractor:
         if stride <= 0:
             raise ValueError(f"Stride must be positive, got {stride}")
 
-        y_positions = list(range(0, h - self.patch_size + 1, stride))
-        x_positions = list(range(0, w - self.patch_size + 1, stride))
+        tissue_rows = np.any(mask > 0, axis=1)
+        tissue_cols = np.any(mask > 0, axis=0)
+
+        if not tissue_rows.any() or not tissue_cols.any():
+            return [], []
+
+        y_min_tissue, y_max_tissue = np.where(tissue_rows)[0][[0, -1]]
+        x_min_tissue, x_max_tissue = np.where(tissue_cols)[0][[0, -1]]
+
+        # Add padding (half patch size) to ensure we cover edges
+        padding = self.patch_size // 2
+        y_start = max(0, y_min_tissue - padding)
+        y_end = min(h, y_max_tissue + padding)
+        x_start = max(0, x_min_tissue - padding)
+        x_end = min(w, x_max_tissue + padding)
+
+        # ===== Grid within tissue bounding box =====
+        y_positions = list(range(y_start, y_end - self.patch_size + 1, stride))
+        x_positions = list(range(x_start, x_end - self.patch_size + 1, stride))
 
         valid_patches = []
 
@@ -195,6 +212,7 @@ class TissueExtractor:
         if shuffle:
             np.random.shuffle(valid_patches)
         else:
+            # Sort by tissue ratio (highest first) for deterministic selection
             valid_patches.sort(key=lambda x: x[2], reverse=True)
 
         patches_img = []

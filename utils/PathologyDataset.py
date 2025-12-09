@@ -114,10 +114,24 @@ class PathologyDataset(Dataset):
         img_path = self.data_dir / f"img_{sample_idx}.png"
         img = np.array(Image.open(img_path).convert("RGB"))
 
+        mask = None
         if self.use_mask:
             mask_path = self.data_dir / f"mask_{sample_idx}.png"
             if mask_path.exists():
                 mask = np.array(Image.open(mask_path).convert("L"))
+            else:
+                # Generate mask by detecting tissue (non-white regions)
+                # Convert to grayscale
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+                # Threshold to detect non-white regions (tissue)
+                # Assume background is bright (white/near-white)
+                _, mask = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY_INV)
+
+                # Optional: morphological operations to clean up mask
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
         return img, mask
 

@@ -1,28 +1,28 @@
 sample_index,label
 img_0000.png,Luminal A
 img_0001.png,Luminal A
-img_0002.png,Luminal A
-img_0003.png,Luminal B
-img_0004.png,HER2(+)
-img_0005.png,Triple negative
+img_0002.png,Luminal B
+img_0003.png,Triple negative
+img_0004.png,Luminal A
+img_0005.png,Luminal B
 img_0006.png,Luminal B
 img_0007.png,Luminal B
-img_0008.png,Luminal B
+img_0008.png,Luminal A
 img_0009.png,Luminal A
 img_0010.png,Luminal B
-img_0011.png,Luminal B
+img_0011.png,Luminal A
 img_0012.png,Luminal B
-img_0013.png,Luminal B
-img_0014.png,HER2(+)
+img_0013.png,Luminal A
+img_0014.png,Triple negative
 img_0015.png,Luminal B
 img_0016.png,Luminal A
-img_0017.png,HER2(+)
+img_0017.png,Luminal B
 img_0018.png,Luminal A
 img_0019.png,Luminal A
-img_0020.png,Luminal B
+img_0020.png,Luminal A
 img_0021.png,Luminal B
 img_0022.png,Luminal B
-img_0023.png,Luminal A
+img_0023.png,Luminal B
 img_0024.png,Luminal B
 img_0025.png,Luminal A
 img_0026.png,Luminal B
@@ -30,53 +30,53 @@ img_0027.png,Luminal A
 img_0028.png,Luminal A
 img_0029.png,Luminal A
 img_0030.png,Luminal B
-img_0031.png,HER2(+)
-img_0032.png,Luminal A
+img_0031.png,Luminal A
+img_0032.png,Luminal B
 img_0033.png,Triple negative
 img_0034.png,Luminal A
 img_0035.png,Luminal B
 img_0036.png,Luminal B
 img_0037.png,Luminal B
-img_0038.png,Triple negative
+img_0038.png,Luminal A
 img_0039.png,Luminal A
-img_0040.png,Triple negative
-img_0041.png,HER2(+)
+img_0040.png,Luminal B
+img_0041.png,Triple negative
 img_0042.png,Luminal A
 img_0043.png,Luminal A
 img_0044.png,Luminal A
-img_0045.png,Luminal B
+img_0045.png,Luminal A
 img_0046.png,Luminal B
 img_0047.png,Triple negative
 img_0048.png,Luminal B
 img_0049.png,Luminal B
-img_0050.png,Luminal B
+img_0050.png,Triple negative
 img_0051.png,Luminal B
-img_0052.png,Luminal B
+img_0052.png,HER2(+)
 img_0053.png,Luminal B
 img_0054.png,Luminal A
-img_0055.png,Luminal B
-img_0056.png,Luminal B
-img_0057.png,Luminal A
+img_0055.png,Luminal A
+img_0056.png,Triple negative
+img_0057.png,Luminal B
 img_0058.png,Luminal B
-img_0059.png,HER2(+)
+img_0059.png,Luminal B
 img_0060.png,Luminal A
-img_0061.png,HER2(+)
+img_0061.png,Luminal A
 img_0062.png,Luminal A
 img_0063.png,Luminal B
 img_0064.png,Luminal B
-img_0065.png,Luminal B
-img_0066.png,Luminal A
-img_0067.png,Luminal B
-img_0068.png,Luminal B
+img_0065.png,Triple negative
+img_0066.png,Luminal B
+img_0067.png,HER2(+)
+img_0068.png,Luminal A
 img_0069.png,Luminal A
-img_0070.png,HER2(+)
-img_0071.png,Luminal B
+img_0070.png,Triple negative
+img_0071.png,Triple negative
 img_0072.png,Luminal B
-img_0073.png,Luminal B
-img_0074.png,HER2(+)
+img_0073.png,Triple negative
+img_0074.png,Luminal A
 img_0075.png,Luminal B
-img_0076.png,Luminal B
-img_0077.png,Luminal B
+img_0076.png,Triple negative
+img_0077.png,Triple negative
 img_0078.png,Triple negative
 img_0079.png,Triple negative
 img_0080.png,Luminal B
@@ -91,62 +91,62 @@ img_0088.png,Luminal A
 img_0089.png,Luminal B
 img_0090.png,Luminal A
 img_0091.png,Luminal B
-img_0092.png,Luminal B
+img_0092.png,Triple negative
 img_0093.png,Luminal A
-img_0094.png,HER2(+)
+img_0094.png,Luminal A
 img_0095.png,Luminal B
-img_0096.png,Luminal B
+img_0096.png,Luminal A
 img_0097.png,Luminal A
-img_0098.png,Triple negative
-img_0099.png,HER2(+)
-img_0100.png,Luminal A
+img_0098.png,Luminal A
+img_0099.png,Triple negative
+img_0100.png,Triple negative
 img_0101.png,Luminal B
 img_0102.png,Luminal B
-img_0103.png,Triple negative
+img_0103.png,Luminal A
 img_0104.png,Triple negative
-img_0105.png,Luminal B
-img_0106.png,Luminal B
+img_0105.png,Triple negative
+img_0106.png,Luminal A
 img_0107.png,Triple negative
 img_0108.png,Triple negative
 img_0109.png,Luminal A
-img_0110.png,Luminal B
+img_0110.png,Triple negative
 img_0111.png,Luminal B
-img_0112.png,Luminal B
-img_0113.png,Luminal B
+img_0112.png,Luminal A
+img_0113.png,Triple negative
 img_0114.png,Triple negative
 img_0115.png,Luminal B
-img_0116.png,HER2(+)
-img_0117.png,HER2(+)
-img_0118.png,Triple negative
+img_0116.png,Triple negative
+img_0117.png,Luminal B
+img_0118.png,Luminal B
 img_0119.png,Luminal A
 img_0120.png,Triple negative
-img_0121.png,Luminal A
+img_0121.png,Luminal B
 img_0122.png,Luminal B
-img_0123.png,Luminal A
+img_0123.png,Luminal B
 img_0124.png,Luminal A
 img_0125.png,Luminal B
-img_0126.png,Luminal B
+img_0126.png,Triple negative
 img_0127.png,Luminal A
-img_0128.png,Luminal B
+img_0128.png,Luminal A
 img_0129.png,Luminal A
 img_0130.png,Luminal A
 img_0131.png,Luminal B
 img_0132.png,Luminal A
-img_0133.png,HER2(+)
+img_0133.png,Luminal B
 img_0134.png,Luminal A
 img_0135.png,Luminal A
 img_0136.png,Luminal A
-img_0137.png,Triple negative
-img_0138.png,Triple negative
-img_0139.png,Luminal A
+img_0137.png,Luminal B
+img_0138.png,Luminal B
+img_0139.png,Luminal B
 img_0140.png,Luminal A
-img_0141.png,Luminal B
-img_0142.png,Luminal B
+img_0141.png,Luminal A
+img_0142.png,Triple negative
 img_0143.png,Triple negative
 img_0144.png,Luminal A
-img_0145.png,HER2(+)
-img_0146.png,Luminal B
-img_0147.png,Luminal A
+img_0145.png,Luminal A
+img_0146.png,Triple negative
+img_0147.png,Triple negative
 img_0148.png,Luminal A
 img_0149.png,Triple negative
 img_0150.png,Luminal A
@@ -154,57 +154,57 @@ img_0151.png,Luminal A
 img_0152.png,Triple negative
 img_0153.png,Luminal B
 img_0154.png,Triple negative
-img_0155.png,Luminal B
+img_0155.png,Triple negative
 img_0156.png,Triple negative
 img_0157.png,Triple negative
 img_0158.png,Luminal A
 img_0159.png,Luminal B
 img_0160.png,Luminal A
-img_0161.png,HER2(+)
-img_0162.png,HER2(+)
+img_0161.png,Luminal B
+img_0162.png,Luminal B
 img_0163.png,Luminal B
 img_0164.png,Luminal B
-img_0165.png,Triple negative
-img_0166.png,HER2(+)
-img_0167.png,Luminal B
-img_0168.png,Triple negative
-img_0169.png,Luminal A
-img_0170.png,Luminal B
+img_0165.png,Luminal B
+img_0166.png,Triple negative
+img_0167.png,Luminal A
+img_0168.png,Luminal B
+img_0169.png,HER2(+)
+img_0170.png,Triple negative
 img_0171.png,Luminal B
-img_0172.png,Luminal B
-img_0173.png,Triple negative
+img_0172.png,Triple negative
+img_0173.png,Luminal B
 img_0174.png,Luminal A
-img_0175.png,HER2(+)
-img_0176.png,Luminal B
+img_0175.png,Luminal A
+img_0176.png,Triple negative
 img_0177.png,Triple negative
 img_0178.png,Luminal B
-img_0179.png,Luminal B
+img_0179.png,Triple negative
 img_0180.png,Luminal A
 img_0181.png,Luminal A
 img_0182.png,Luminal A
-img_0183.png,HER2(+)
+img_0183.png,Luminal A
 img_0184.png,Luminal B
-img_0185.png,HER2(+)
+img_0185.png,Luminal B
 img_0186.png,Luminal A
-img_0187.png,HER2(+)
+img_0187.png,Luminal B
 img_0188.png,Luminal B
-img_0189.png,Luminal B
-img_0190.png,Luminal B
+img_0189.png,Luminal A
+img_0190.png,Triple negative
 img_0191.png,Luminal A
 img_0192.png,Triple negative
-img_0193.png,HER2(+)
-img_0194.png,Luminal B
+img_0193.png,Luminal B
+img_0194.png,Triple negative
 img_0195.png,Luminal A
 img_0196.png,Luminal B
 img_0197.png,Luminal A
-img_0198.png,Luminal B
+img_0198.png,Triple negative
 img_0199.png,Luminal A
 img_0200.png,Triple negative
 img_0201.png,Luminal B
-img_0202.png,Luminal A
+img_0202.png,Triple negative
 img_0203.png,Triple negative
-img_0204.png,Luminal B
-img_0205.png,HER2(+)
+img_0204.png,Triple negative
+img_0205.png,Triple negative
 img_0206.png,Triple negative
 img_0207.png,Luminal B
 img_0208.png,Luminal B
@@ -212,267 +212,267 @@ img_0209.png,Triple negative
 img_0210.png,Luminal B
 img_0211.png,Luminal A
 img_0212.png,Luminal B
-img_0213.png,HER2(+)
+img_0213.png,Luminal B
 img_0214.png,Luminal B
 img_0215.png,Luminal A
-img_0216.png,Luminal A
+img_0216.png,Triple negative
 img_0217.png,Luminal B
-img_0218.png,HER2(+)
-img_0219.png,Luminal A
-img_0220.png,HER2(+)
-img_0221.png,HER2(+)
+img_0218.png,Luminal B
+img_0219.png,Luminal B
+img_0220.png,Luminal B
+img_0221.png,Triple negative
 img_0222.png,Luminal A
-img_0223.png,Luminal B
-img_0224.png,Luminal B
+img_0223.png,Triple negative
+img_0224.png,Luminal A
 img_0225.png,Luminal A
-img_0226.png,HER2(+)
+img_0226.png,Luminal B
 img_0227.png,Luminal A
 img_0228.png,Triple negative
-img_0229.png,Luminal B
-img_0230.png,HER2(+)
-img_0231.png,Luminal B
-img_0232.png,Luminal B
-img_0233.png,HER2(+)
+img_0229.png,Triple negative
+img_0230.png,Luminal B
+img_0231.png,Luminal A
+img_0232.png,Triple negative
+img_0233.png,Luminal B
 img_0234.png,Triple negative
 img_0235.png,Triple negative
 img_0236.png,Luminal B
 img_0237.png,Luminal B
-img_0238.png,Luminal A
+img_0238.png,Triple negative
 img_0239.png,Luminal B
-img_0240.png,Luminal A
+img_0240.png,Luminal B
 img_0241.png,Luminal A
-img_0242.png,Luminal A
-img_0243.png,Luminal A
-img_0244.png,HER2(+)
-img_0245.png,HER2(+)
-img_0246.png,Luminal B
-img_0247.png,Luminal B
+img_0242.png,Luminal B
+img_0243.png,Luminal B
+img_0244.png,Triple negative
+img_0245.png,Triple negative
+img_0246.png,HER2(+)
+img_0247.png,Luminal A
 img_0248.png,Luminal B
-img_0249.png,HER2(+)
-img_0250.png,HER2(+)
-img_0251.png,Luminal B
-img_0252.png,Luminal B
+img_0249.png,Triple negative
+img_0250.png,Luminal B
+img_0251.png,Triple negative
+img_0252.png,Triple negative
 img_0253.png,Triple negative
 img_0254.png,Luminal A
 img_0255.png,Luminal A
 img_0256.png,Luminal B
-img_0257.png,Luminal A
+img_0257.png,Triple negative
 img_0258.png,Luminal A
 img_0259.png,Luminal A
-img_0260.png,Triple negative
-img_0261.png,Triple negative
-img_0262.png,Luminal B
+img_0260.png,Luminal B
+img_0261.png,Luminal A
+img_0262.png,Luminal A
 img_0263.png,Luminal B
 img_0264.png,Luminal A
 img_0265.png,Luminal B
 img_0266.png,Luminal A
 img_0267.png,Luminal B
-img_0268.png,Luminal B
+img_0268.png,Triple negative
 img_0269.png,Luminal A
 img_0270.png,Triple negative
-img_0271.png,Luminal A
-img_0272.png,HER2(+)
-img_0273.png,Luminal B
+img_0271.png,Luminal B
+img_0272.png,Luminal B
+img_0273.png,Triple negative
 img_0274.png,Luminal B
 img_0275.png,Luminal B
 img_0276.png,Triple negative
 img_0277.png,Triple negative
 img_0278.png,Triple negative
-img_0279.png,HER2(+)
+img_0279.png,Luminal A
 img_0280.png,Luminal A
 img_0281.png,Luminal A
 img_0282.png,Luminal B
-img_0283.png,HER2(+)
-img_0284.png,HER2(+)
-img_0285.png,Luminal A
-img_0286.png,Luminal B
-img_0287.png,HER2(+)
+img_0283.png,Luminal B
+img_0284.png,Luminal A
+img_0285.png,Luminal B
+img_0286.png,Luminal A
+img_0287.png,Triple negative
 img_0288.png,Luminal B
 img_0289.png,Luminal A
-img_0290.png,Luminal A
-img_0291.png,Luminal B
-img_0292.png,HER2(+)
-img_0293.png,HER2(+)
+img_0290.png,Luminal B
+img_0291.png,Triple negative
+img_0292.png,Luminal B
+img_0293.png,Luminal B
 img_0294.png,Luminal B
-img_0295.png,HER2(+)
-img_0296.png,Luminal B
-img_0297.png,Luminal B
+img_0295.png,Triple negative
+img_0296.png,Triple negative
+img_0297.png,Luminal A
 img_0298.png,Luminal B
-img_0299.png,HER2(+)
+img_0299.png,Luminal B
 img_0300.png,Triple negative
-img_0301.png,Luminal B
-img_0302.png,Luminal B
-img_0303.png,HER2(+)
+img_0301.png,Triple negative
+img_0302.png,Triple negative
+img_0303.png,Luminal B
 img_0304.png,Luminal B
 img_0305.png,Triple negative
 img_0306.png,Luminal B
-img_0307.png,HER2(+)
+img_0307.png,Luminal B
 img_0308.png,Luminal B
-img_0309.png,HER2(+)
+img_0309.png,Luminal B
 img_0310.png,Luminal B
-img_0311.png,Luminal A
+img_0311.png,Luminal B
 img_0312.png,Luminal B
-img_0313.png,Triple negative
+img_0313.png,Luminal B
 img_0314.png,Triple negative
 img_0315.png,Luminal B
 img_0316.png,Luminal B
-img_0317.png,Luminal B
-img_0318.png,HER2(+)
+img_0317.png,Triple negative
+img_0318.png,Luminal B
 img_0319.png,Luminal A
-img_0320.png,Luminal B
-img_0321.png,Luminal B
+img_0320.png,Luminal A
+img_0321.png,Triple negative
 img_0322.png,Triple negative
 img_0323.png,Luminal B
 img_0324.png,Triple negative
-img_0325.png,HER2(+)
+img_0325.png,Luminal A
 img_0326.png,Triple negative
 img_0327.png,Triple negative
-img_0328.png,Luminal A
+img_0328.png,Triple negative
 img_0329.png,Luminal B
-img_0330.png,Luminal B
+img_0330.png,Triple negative
 img_0331.png,Luminal A
-img_0332.png,HER2(+)
-img_0333.png,Luminal B
+img_0332.png,Luminal B
+img_0333.png,Luminal A
 img_0334.png,Luminal A
 img_0335.png,Luminal A
 img_0336.png,Luminal A
 img_0337.png,Luminal A
-img_0338.png,Triple negative
-img_0339.png,Luminal B
+img_0338.png,Luminal A
+img_0339.png,Triple negative
 img_0340.png,Luminal B
-img_0341.png,HER2(+)
-img_0342.png,Luminal B
-img_0343.png,Luminal B
+img_0341.png,Luminal B
+img_0342.png,Triple negative
+img_0343.png,Triple negative
 img_0344.png,Triple negative
-img_0345.png,Luminal B
-img_0346.png,Luminal B
+img_0345.png,Triple negative
+img_0346.png,Triple negative
 img_0347.png,Triple negative
-img_0348.png,Luminal A
-img_0349.png,Triple negative
+img_0348.png,Luminal B
+img_0349.png,Luminal B
 img_0350.png,Luminal A
 img_0351.png,Luminal A
-img_0352.png,Triple negative
-img_0353.png,Luminal B
+img_0352.png,Luminal A
+img_0353.png,Luminal A
 img_0354.png,Luminal A
-img_0355.png,Luminal B
+img_0355.png,Triple negative
 img_0356.png,HER2(+)
 img_0357.png,Luminal B
-img_0358.png,Triple negative
-img_0359.png,Luminal B
-img_0360.png,HER2(+)
+img_0358.png,Luminal A
+img_0359.png,Triple negative
+img_0360.png,Triple negative
 img_0361.png,Luminal A
-img_0362.png,Luminal A
+img_0362.png,Luminal B
 img_0363.png,Luminal A
 img_0364.png,Luminal B
-img_0365.png,HER2(+)
+img_0365.png,Luminal B
 img_0366.png,Luminal A
 img_0367.png,Luminal A
-img_0368.png,Luminal A
-img_0369.png,Triple negative
+img_0368.png,Triple negative
+img_0369.png,Luminal B
 img_0370.png,Luminal B
 img_0371.png,Luminal B
 img_0372.png,Triple negative
 img_0373.png,Luminal B
 img_0374.png,Luminal B
 img_0375.png,Luminal B
-img_0376.png,HER2(+)
+img_0376.png,Luminal B
 img_0377.png,Luminal A
 img_0378.png,Luminal A
-img_0379.png,Luminal B
-img_0380.png,Triple negative
+img_0379.png,Triple negative
+img_0380.png,Luminal B
 img_0381.png,Luminal B
 img_0382.png,Luminal A
-img_0383.png,Triple negative
+img_0383.png,Luminal A
 img_0384.png,Luminal A
-img_0385.png,Luminal B
+img_0385.png,Triple negative
 img_0386.png,Triple negative
 img_0387.png,Luminal B
 img_0388.png,Luminal B
 img_0389.png,Luminal B
 img_0390.png,Luminal A
-img_0391.png,Triple negative
-img_0392.png,HER2(+)
-img_0393.png,HER2(+)
-img_0394.png,Triple negative
+img_0391.png,Luminal B
+img_0392.png,Luminal A
+img_0393.png,Triple negative
+img_0394.png,Luminal A
 img_0395.png,Luminal B
 img_0396.png,Triple negative
 img_0397.png,Triple negative
-img_0398.png,Luminal B
+img_0398.png,Triple negative
 img_0399.png,Luminal A
-img_0400.png,HER2(+)
-img_0401.png,Luminal A
-img_0402.png,Triple negative
-img_0403.png,Luminal A
+img_0400.png,Luminal A
+img_0401.png,Triple negative
+img_0402.png,Luminal B
+img_0403.png,Triple negative
 img_0404.png,Luminal B
 img_0405.png,Luminal A
-img_0406.png,Luminal A
-img_0407.png,Luminal B
+img_0406.png,Luminal B
+img_0407.png,Triple negative
 img_0408.png,Triple negative
-img_0409.png,Luminal B
+img_0409.png,Luminal A
 img_0410.png,HER2(+)
-img_0411.png,Luminal B
+img_0411.png,Luminal A
 img_0412.png,Luminal B
 img_0413.png,Triple negative
-img_0414.png,Luminal B
+img_0414.png,Triple negative
 img_0415.png,Luminal B
-img_0416.png,Luminal A
+img_0416.png,Triple negative
 img_0417.png,Luminal B
-img_0418.png,HER2(+)
+img_0418.png,Triple negative
 img_0419.png,Luminal B
-img_0420.png,Luminal A
-img_0421.png,Luminal A
-img_0422.png,Luminal B
-img_0423.png,HER2(+)
+img_0420.png,Luminal B
+img_0421.png,Triple negative
+img_0422.png,Luminal A
+img_0423.png,Luminal B
 img_0424.png,Luminal B
 img_0425.png,Triple negative
-img_0426.png,HER2(+)
-img_0427.png,Triple negative
+img_0426.png,Luminal A
+img_0427.png,Luminal A
 img_0428.png,Luminal A
 img_0429.png,Luminal B
 img_0430.png,Triple negative
 img_0431.png,Luminal A
 img_0432.png,Luminal B
-img_0433.png,HER2(+)
+img_0433.png,Luminal B
 img_0434.png,Luminal B
-img_0435.png,Luminal B
-img_0436.png,HER2(+)
+img_0435.png,Luminal A
+img_0436.png,Luminal A
 img_0437.png,Luminal B
-img_0438.png,Luminal B
+img_0438.png,Triple negative
 img_0439.png,Luminal B
-img_0440.png,Luminal B
+img_0440.png,Triple negative
 img_0441.png,Triple negative
-img_0442.png,HER2(+)
-img_0443.png,Luminal B
-img_0444.png,HER2(+)
-img_0445.png,HER2(+)
+img_0442.png,Luminal B
+img_0443.png,Triple negative
+img_0444.png,Luminal B
+img_0445.png,Luminal B
 img_0446.png,Luminal A
-img_0447.png,Triple negative
+img_0447.png,Luminal B
 img_0448.png,Luminal B
 img_0449.png,Luminal B
 img_0450.png,Triple negative
-img_0451.png,HER2(+)
+img_0451.png,Luminal A
 img_0452.png,Luminal A
 img_0453.png,Luminal A
 img_0454.png,Luminal B
 img_0455.png,Triple negative
-img_0456.png,Luminal A
+img_0456.png,HER2(+)
 img_0457.png,Luminal A
 img_0458.png,Luminal A
-img_0459.png,Triple negative
-img_0460.png,HER2(+)
-img_0461.png,HER2(+)
-img_0462.png,HER2(+)
-img_0463.png,Luminal B
+img_0459.png,Luminal B
+img_0460.png,Triple negative
+img_0461.png,Triple negative
+img_0462.png,Luminal B
+img_0463.png,Triple negative
 img_0464.png,Luminal B
 img_0465.png,Luminal B
-img_0466.png,Triple negative
+img_0466.png,Luminal B
 img_0467.png,Triple negative
-img_0468.png,Triple negative
+img_0468.png,Luminal B
 img_0469.png,Luminal B
-img_0470.png,HER2(+)
-img_0471.png,Luminal B
-img_0472.png,Luminal B
+img_0470.png,Triple negative
+img_0471.png,Triple negative
+img_0472.png,Triple negative
 img_0473.png,Luminal B
-img_0474.png,Luminal B
-img_0475.png,HER2(+)
+img_0474.png,Triple negative
+img_0475.png,Luminal B
 img_0476.png,Luminal A

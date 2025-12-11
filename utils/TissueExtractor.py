@@ -158,6 +158,10 @@ class TissueExtractor:
                 patches_mask.append(mask_patch)
                 selected_centers.append((cy, cx))
 
+        # Apply mask to the patches to keep only annotation points
+        for i in range(len(patches_mask)):
+            patches_img[i] = patches_img[i] * (patches_mask[i][:, :, np.newaxis] > 0)
+
         return patches_img, patches_mask
 
     def _extract_grid(
@@ -229,6 +233,9 @@ class TissueExtractor:
 
             patches_img.append(img[y_min:y_max, x_min:x_max])
             patches_mask.append(mask[y_min:y_max, x_min:x_max])
+
+        for i in range(len(patches_mask)):
+            patches_img[i] = patches_img[i] * (patches_mask[i][:, :, np.newaxis] > 0)
 
         return patches_img, patches_mask
 

@@ -21,7 +21,13 @@ class TissueExtractor:
         self.min_annotation_pixels = min_annotation_pixels
 
     def _validate_inputs(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Validate inputs and return processed mask."""
+        """
+        Validate inputs and return processed mask.
+
+        Args:
+            img: RGB image (H, W, 3)
+            mask: Annotation mask (H, W) or (H, W, C)
+        """
         if img.shape[:2] != mask.shape[:2]:
             raise ValueError(
                 f"Image shape {img.shape[:2]} doesn't match mask shape {mask.shape[:2]}"
@@ -56,8 +62,8 @@ class TissueExtractor:
         Extract tissue patches centered around cancer annotations in mask.
 
         Args:
-            img: RGB image (H, W, 3) - the full tissue image
-            mask: Annotation mask (H, W) - cancer point annotations (sparse)
+            img: RGB image (H, W, 3) - the full tissue image.
+            mask: Annotation mask (H, W) - cancer point annotations.
             num_patches: Number of patches to extract per image.
             strategy: 'random' samples from annotation points; 'grid' finds patches containing annotations.
             stride: Step size for grid strategy. Defaults to patch_size (no overlap).
@@ -108,6 +114,15 @@ class TissueExtractor:
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
         Random sampling: center patches on annotation points to capture surrounding tissue.
+
+        Args:
+            img: RGB image (H, W, 3)
+            mask: Annotation mask (H, W)
+            annotation_indices: Tuple of arrays with y and x indices of annotation pixels.
+            num_patches: Number of patches to extract.
+            h: Height of the image.
+            w: Width of the image.
+            min_distance: Minimum distance between patch centers.
         """
         patches_img = []
         patches_mask = []
@@ -158,10 +173,6 @@ class TissueExtractor:
                 patches_mask.append(mask_patch)
                 selected_centers.append((cy, cx))
 
-        # Apply mask to the patches to keep only annotation points
-        for i in range(len(patches_mask)):
-            patches_img[i] = patches_img[i] * (patches_mask[i][:, :, np.newaxis] > 0)
-
         return patches_img, patches_mask
 
     def _extract_grid(
@@ -177,6 +188,15 @@ class TissueExtractor:
         """
         Grid strategy: find patches that contain annotation points.
         Prioritizes patches with more annotation pixels.
+
+        Args:
+            img: RGB image (H, W, 3)
+            mask: Annotation mask (H, W)
+            num_patches: Number of patches to extract.
+            h: Height of the image.
+            w: Width of the image.
+            stride: Step size for grid sampling. Defaults to patch_size (no overlap).
+            shuffle: Whether to shuffle valid patches before selection.
         """
         if stride is None:
             stride = self.patch_size
@@ -234,59 +254,4 @@ class TissueExtractor:
             patches_img.append(img[y_min:y_max, x_min:x_max])
             patches_mask.append(mask[y_min:y_max, x_min:x_max])
 
-        for i in range(len(patches_mask)):
-            patches_img[i] = patches_img[i] * (patches_mask[i][:, :, np.newaxis] > 0)
-
         return patches_img, patches_mask
-
-    def get_all_valid_patches(
-        self,
-        img: np.ndarray,
-        mask: np.ndarray,
-        stride: Optional[int] = None,
-    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[Tuple[int, int]]]:
-        """Extract ALL patches containing annotations from the image."""
-
-        mask = self._validate_inputs(img, mask)
-        h, w = img.shape[:2]
-
-        if stride is None:
-            stride = self.patch_size
-
-        # Focus on region around annotations
-        annotation_rows = np.any(mask > 0, axis=1)
-        annotation_cols = np.any(mask > 0, axis=0)
-
-        if not annotation_rows.any() or not annotation_cols.any():
-            return [], [], []
-
-        y_min_ann, y_max_ann = np.where(annotation_rows)[0][[0, -1]]
-        x_min_ann, x_max_ann = np.where(annotation_cols)[0][[0, -1]]
-
-        padding = self.patch_size
-        y_start = max(0, y_min_ann - padding)
-        y_end = min(h, y_max_ann + padding)
-        x_start = max(0, x_min_ann - padding)
-        x_end = min(w, x_max_ann + padding)
-
-        y_positions = list(range(y_start, y_end - self.patch_size + 1, stride))
-        x_positions = list(range(x_start, x_end - self.patch_size + 1, stride))
-
-        patches_img = []
-        patches_mask = []
-        coordinates = []
-
-        for y_min in y_positions:
-            for x_min in x_positions:
-                y_max = y_min + self.patch_size
-                x_max = x_min + self.patch_size
-
-                mask_patch = mask[y_min:y_max, x_min:x_max]
-                annotation_count = np.count_nonzero(mask_patch)
-
-                if annotation_count >= self.min_annotation_pixels:
-                    patches_img.append(img[y_min:y_max, x_min:x_max])
-                    patches_mask.append(mask_patch)
-                    coordinates.append((y_min, x_min))
-
-        return patches_img, patches_mask, coordinates

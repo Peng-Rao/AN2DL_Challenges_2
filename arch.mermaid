@@ -1,0 +1,61 @@
+graph TD
+    subgraph Inputs
+    I_L[("x_local<br/>(High-Res Patches)<br/>[B, N, 3, H, W]")]
+    I_G[("x_global<br/>(Context Image)<br/>[B, 3, Hg, Wg]")]
+    I_M[("mask<br/>(Optional)<br/>[B, N, 1, H, W]")]
+    end
+
+    %% Global Stream
+    subgraph "Global Stream (Context)"
+    G_BB["Global Backbone<br/>(TIMM: ResNet18 etc)"]
+    G_FEAT["Global Features<br/>[B, D_global]"]
+    end
+
+    %% Local Stream
+    subgraph "Local Stream (Details)"
+    L_FLAT["Reshape/Flatten<br/>[B*N, 3, H, W]"]
+    L_BB["Local Backbone<br/>(TIMM: ResNet50 etc)"]
+    L_FEAT["Patch Features<br/>[B*N, D_local]"]
+    
+    %% Optional Mask Stream
+    M_CNN["SimpleCNN<br/>(4 Layers)"]
+    M_FEAT["Mask Features<br/>[B*N, 128]"]
+    CONCAT_M["Concat Features"]
+    end
+
+    %% Aggregation
+    subgraph "MIL Aggregation"
+    RESHAPE["Reshape to Bag<br/>[B, N, D_total]"]
+    MIL["MIL Module<br/>(Attention / CLAM / TransMIL)"]
+    AGG_OUT["Aggregated Representation<br/>[B, D_local]"]
+    end
+
+    %% Classifier
+    subgraph "Head"
+    FUSE["Concatenate Global + Local"]
+    CLF["MLP Classifier<br/>(Norm -> Dropout -> Linear -> GELU -> Linear)"]
+    OUT["Logits<br/>[B, Num_Classes]"]
+    end
+
+    %% Connections
+    I_G --> G_BB --> G_FEAT
+    
+    I_L --> L_FLAT --> L_BB --> L_FEAT
+    
+    %% Conditional Mask Logic
+    I_M -.->|"If Dual Stream"| M_CNN --> M_FEAT
+    L_FEAT --> CONCAT_M
+    M_FEAT -.-> CONCAT_M
+    CONCAT_M --> RESHAPE
+    L_FEAT -.->|"No Mask"| RESHAPE
+
+    RESHAPE --> MIL --> AGG_OUT
+    
+    AGG_OUT --> FUSE
+    G_FEAT --> FUSE
+    
+    FUSE --> CLF --> OUT
+
+    style I_M stroke-dasharray: 5 5
+    style M_CNN stroke-dasharray: 5 5
+    style M_FEAT stroke-dasharray: 5 5

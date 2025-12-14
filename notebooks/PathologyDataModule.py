@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 class PathologyDataModule(L.LightningDataModule):
     """Lightning DataModule for histopathology image classification.
-    Updated to support Dual-Stream (Image + Mask) loading.
+    Updated to support Global-Local Architecture (img_size propagation).
     """
 
     def __init__(
@@ -25,10 +25,10 @@ class PathologyDataModule(L.LightningDataModule):
         trash_list_path: str,
         batch_size: int = 16,
         num_workers: int = 2,
-        img_size: int = 224,
+        img_size: int = 224,  # Size for Global View
         use_mask: bool = True,
         use_patches: bool = True,
-        patch_size: int = 64,
+        patch_size: int = 64,  # Size for Local View (Patches)
         num_patches: int = 10,
         min_annotation_pixels: int = 50,
         val_split: float = 0.2,
@@ -115,6 +115,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
+                img_size=self.img_size,  # <--- Added explicit pass
                 num_patches=self.num_patches,
                 patch_strategy="random",
                 min_annotation_pixels=self.min_annotation_pixels,
@@ -131,6 +132,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
+                img_size=self.img_size,  # <--- Added explicit pass
                 num_patches=self.num_patches,
                 patch_strategy="grid",
                 stride=self.patch_size // 2,
@@ -149,6 +151,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
+                img_size=self.img_size,  # <--- Added explicit pass
                 num_patches=self.num_patches,
                 patch_strategy="grid",
                 stride=self.patch_size // 2,

@@ -10,6 +10,7 @@
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{hyperref}
+\usepackage{amsfonts}
 \newcolumntype{Y}{>{\centering\arraybackslash}X}
 \usepackage[left=2.00cm, right=2.00cm, top=2.00cm, bottom=2.00cm]{geometry}
 
@@ -44,7 +45,7 @@
     {lingli11}\\
     \vspace{2mm}
     % Matriculation Numbers
-    {Matricola1,}
+    {11032111,}
     {11047870,}
     {11022931,}
     {11022009}\\
@@ -57,7 +58,7 @@
     \section{Introduction}
     Regarding this four-class image classification problem, we employs a patch-based approach where images are subdivided into smaller regions. These patches are processed using \textbf{Multiple Instance Learning (MIL)} aggregation techniques to produce a slide-level prediction.
     \section{Problem Analysis}
-    The dataset consists of pathology images categorized into four subtypes: \textbf{Luminal A, Luminal B, HER2(+), and Triple negative}, includes 690 training images and their mask files.
+    The dataset consists of pathology images categorized into four subtypes: \textbf{Luminal A, Luminal B, HER2(+), and Triple negative}, includes 691 training images and their mask files.
 
     \begin{figure}[H]
         \centering
@@ -67,22 +68,65 @@
 
     \noindent The dataset exhibits class imbalance, with the \textbf{Luminal B} subtype being the most prevalent, \textbf{Triple negative} subtypes are underrepresented.
 
-    We are trying to extract multiple patches from each high-resolution pathology image.
+    We are trying to extract multiple patches from a pathology image.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=1.0\linewidth]{patches_example1.png}
+        \caption{Example of extracted patches from a pathology image (0000)}
+    \end{figure}
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=1.0\linewidth]{patches_example2.png}
+        \caption{Example of extracted patches from a pathology image (0002)}
+    \end{figure}
 
     \section{Method}
-    This section should detail your approach. You can use equations to explain your methodology. For example, a simple model representation:
-    \begin{equation}
-        \label{eq:model}
-        f(x) = \text{softmax}(Wx + b)
-    \end{equation}
+    \subsection{Noisy image recognition}
+    We observed that some images in the dataset are noisy or corrupted (Orcs and Slime), which can negatively impact model performance. To address this, we used two layers of defense:
+    \begin{itemize}
+        \item \textbf{Color Check}: Histology images are never green. If an image has significant green pixels (common for orcs/slimes), it is immediately trashed.
+        \item \textbf{CLIP Classification}: Use \textbf{openai/clip-vit-large-patch14} to identify and filter out these noisy images from the training set. We create text prompts like "a histology image" and "a green slime histology image" to classify images. If an image is classified as "green slime histology image" with high confidence, it is marked as noisy.
+    \end{itemize}
+    Finally, we removed \textbf{101} noisy images from the training set, get \textbf{590} clean images for training.
 
-    \noindent Or a more complex loss function:
-    \begin{equation}
-        \label{eq:loss}
-        \mathcal{L} = -\frac{1}{N}\sum_{i=1}^{N} y_i\log(\hat{y}_i)
-    \end{equation}
+    \subsection{Data Augmentation}
+    To enhance model robustness and generalization, we applied various data augmentation techniques during training, including
+    \begin{itemize}
+        \item Random rotations and flips
+        \item Color jittering (brightness, contrast, saturation adjustments)
+        \item Mixup augmentation
+    \end{itemize}
 
-    \noindent Reference these equations in your text, like:``As shown in equation~\ref{eq:model}..."
+    \subsection{Dual-stream MIL Network}
+    We use a Dual-Stream Multiple Instance Learning (MIL) architecture designed to integrate local morphological details with global spatial context. As illustrated in ~\ref{fig:dual_stream_mil}, the network processes a image through two parallel streams: a \textit{Local Stream} (Bag of Instances) and a \textit{Global Stream} (Contextual View), fusing their representations for final classification.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=1.0\linewidth]{Dual-Stream-MIL.png}
+        \caption{Dual-Stream MIL Architecture}
+        \label{fig:dual_stream_mil}
+    \end{figure}
+
+    \paragraph{Feature Extraction}
+    Each patch $x_i$ is processed independently by a shared backbone encoder $f_\theta$ (e.g., ResNet50), yielding a raw feature vector. To reduce dimensionality and enforce feature selection, we apply a bottleneck $B_{local}$ consisting of a linear projection, LayerNorm, GELU activation, and Dropout:
+
+    \paragraph{Optional Mask Fusion}
+    If binary segmentation masks $m_i$ are provided, they are processed by a lightweight 4-layer CNN, $g_\phi$. The resulting mask embeddings are concatenated with the patch features:
+
+    \paragraph{MIL Aggregation}
+    To obtain a permutation-invariant representation of the entire bag, we employ an aggregation function $\mathcal{A}(\cdot)$. While the architecture supports CLAM and TransMIL, the general attention-based aggregation is defined as:
+    where $a_i$ represent learnable attention scores computed via a Gated Attention mechanism (Ilse et al., 2018) or a Transformer encoder, ensuring the model focuses on diagnostically relevant patches.
+
+    To capture macro-architectural patterns often lost in patch-based tiling, we introduce a global stream. A downsampled view of the ROI or WSI, $X_{global}$, is processed by a secondary backbone $q_\psi$ (e.g., ResNet18). Similar to the local stream, this is projected via a bottleneck $B_{global}$:
+
+    The final slide-level representation $\mathbf{Z}$ is obtained by concatenating the aggregated local features and the global context vector:
+    This fused vector is passed to a multi-layer perceptron (MLP) classifier with aggressive dropout and GELU activation to predict the class probability distribution $\hat{Y}$:
+
+    The model is trained using Cross-Entropy loss with support for Mixup augmentation and label smoothing to improve generalization.
+
+    \pagebreak
 
     \section{Experiments}
     For your experiments, you might want to present your results in tables. Here's an example of a wide table comparing different models:

@@ -1,6 +1,6 @@
 import random
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import albumentations as A
 import cv2
@@ -14,7 +14,15 @@ from torch.utils.data import Dataset
 
 
 class PathologyDataset(Dataset):
-    """Dataset optimized for histopathology images."""
+    """
+    Dataset optimized for Histopathology with Global-Local Architecture support.
+
+    Returns:
+        x_local: Tensor [Num_Patches, 3, Patch_Size, Patch_Size]
+        x_global: Tensor [3, Img_Size, Img_Size]
+        mask: (Optional) Tensor [Num_Patches, 1, Patch_Size, Patch_Size]
+        label/id: Class label (int) or Sample ID (str)
+    """
 
     def __init__(
         self,
@@ -24,6 +32,7 @@ class PathologyDataset(Dataset):
         use_mask: bool = True,
         use_patches: bool = False,
         patch_size: int = 224,
+        img_size: int = 224,
         num_patches: int = 8,
         patch_strategy: str = "random",
         stride: Optional[int] = None,
@@ -36,16 +45,17 @@ class PathologyDataset(Dataset):
         Args:
             data_dir: Directory with images and masks.
             labels_df: DataFrame with 'sample_index' and 'label' columns (None for test).
-            transform: torchvision transforms to apply to images.
+            transform: Albumentations transforms to apply to LOCAL patches.
             use_mask: Whether to load and use masks.
-            use_patches: Whether to extract patches or use full images.
-            patch_size: Size of square patches to extract.
+            use_patches: Whether to extract patches (Local view).
+            patch_size: Size of square patches to extract (Local view).
+            img_size: Size to resize the full image to (Global view).
             num_patches: Number of patches to extract per image.
             patch_strategy: 'random' or 'grid' strategy for patch extraction.
-            stride: Step size for grid strategy. Defaults to patch_size (no overlap).
+            stride: Step size for grid strategy.
             min_annotation_pixels: Minimum annotation pixels required in patch.
             is_test: Whether the dataset is for testing (no labels).
-            label_encoder: Pre-fitted LabelEncoder (if None, will fit on training labels).
+            label_encoder: Pre-fitted LabelEncoder.
             use_dual_stream: Whether to return masks alongside images.
         """
         self.data_dir = Path(data_dir)
@@ -53,6 +63,7 @@ class PathologyDataset(Dataset):
         self.use_mask = use_mask
         self.use_patches = use_patches
         self.patch_size = patch_size
+        self.img_size = img_size
         self.num_patches = num_patches
         self.patch_strategy = patch_strategy
         self.stride = stride
@@ -61,6 +72,7 @@ class PathologyDataset(Dataset):
         self.label_encoder = label_encoder
         self.use_dual_stream = use_dual_stream
 
+        # 1. Setup Local Transform (Patches)
         if self.transform is None:
             self.transform = A.Compose(
                 [
@@ -68,6 +80,16 @@ class PathologyDataset(Dataset):
                     ToTensorV2(),
                 ]
             )
+
+        # 2. Setup Global Transform (Context)
+        # Always resize to img_size and Normalize
+        self.global_transform = A.Compose(
+            [
+                A.Resize(self.img_size, self.img_size),
+                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                ToTensorV2(),
+            ]
+        )
 
         self.tissue_extractor = TissueExtractor(
             patch_size=patch_size,
@@ -127,14 +149,11 @@ class PathologyDataset(Dataset):
         return img, mask
 
     def _load_patches(
-        self, sample_idx: str
+        self, img: np.ndarray, mask: Optional[np.ndarray]
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
-        Load image patches AND mask patches.
-        Ensures both lists stay synchronized during padding/augmentation.
+        Extract patches from pre-loaded image and mask.
         """
-        img, mask = self._load_image_and_mask(sample_idx)
-
         if mask is None:
             mask = np.ones(img.shape[:2], dtype=np.uint8) * 255
 
@@ -149,6 +168,7 @@ class PathologyDataset(Dataset):
             min_distance=32,
         )
 
+        # Fallback padding if not enough patches
         if len(patches) == 0:
             h, w = img.shape[:2]
             cy, cx = h // 2, w // 2
@@ -190,22 +210,37 @@ class PathologyDataset(Dataset):
 
         return patches, mask_patches
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, ...]:
+    def __getitem__(
+        self, idx: int
+    ) -> Union[
+        Tuple[torch.Tensor, ...], Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ]:
         sample_idx = self.samples[idx]
 
+        # 1. Load Original Full Images (RGB + Mask)
+        full_img, full_mask = self._load_image_and_mask(sample_idx)
+
+        # 2. Prepare Global Image (x_global)
+        # Apply deterministic resize & normalize for context view
+        global_tensor = self.global_transform(image=full_img)["image"]
+
+        # 3. Prepare Local Patches (x_local)
         processed_images = []
         processed_masks = []
 
         if self.use_patches:
-            images_np, masks_np = self._load_patches(sample_idx)
+            patches_np, masks_np = self._load_patches(full_img, full_mask)
         else:
-            img, mask = self._load_image_and_mask(sample_idx)
-            images_np = [img]
-            masks_np = [mask] if mask is not None else []
+            # Fallback if patch usage is disabled (treat whole img as 1 patch)
+            patches_np = [full_img]
+            masks_np = [full_mask] if full_mask is not None else []
 
-        for i in range(len(images_np)):
-            curr_img = images_np[i]
+        # 4. Apply Transforms to Patches
+        for i in range(len(patches_np)):
+            curr_img = patches_np[i]
             transform_args = {"image": curr_img}
+
+            # Masks are only needed if Dual Stream is active
             has_mask = (
                 self.use_dual_stream
                 and (i < len(masks_np))
@@ -216,7 +251,6 @@ class PathologyDataset(Dataset):
                 transform_args["mask"] = masks_np[i]
 
             augmented = self.transform(**transform_args)
-
             processed_images.append(augmented["image"])
 
             if has_mask:
@@ -226,28 +260,29 @@ class PathologyDataset(Dataset):
                 m_tensor = m_tensor.float() / 255.0
                 processed_masks.append(m_tensor)
 
-        if self.use_patches:
-            img_tensor = torch.stack(processed_images)  # [Num_Patches, C, H, W]
-            mask_tensor = (
-                torch.stack(processed_masks) if processed_masks else None
-            )  # [Num_Patches, 1, H, W]
-        else:
-            img_tensor = processed_images[0]
-            mask_tensor = processed_masks[0] if processed_masks else None
+        # Stack Patches
+        img_tensor = torch.stack(processed_images)  # [Num_Patches, 3, H, W]
+        mask_tensor = (
+            torch.stack(processed_masks) if processed_masks else None
+        )  # [Num_Patches, 1, H, W]
+
+        # 5. Construct Return Tuple
+        # Format: (x_local, x_global, [mask], label/id)
 
         if self.is_test:
             if self.use_dual_stream and mask_tensor is not None:
-                return img_tensor, mask_tensor, sample_idx
-            return img_tensor, sample_idx
+                return img_tensor, global_tensor, mask_tensor, sample_idx
+            return img_tensor, global_tensor, sample_idx
         else:
             label = self.encoded_labels[idx]
             label_t = torch.tensor(label, dtype=torch.long)
             if self.use_dual_stream and mask_tensor is not None:
-                return img_tensor, mask_tensor, label_t
-            return img_tensor, label_t
+                return img_tensor, global_tensor, mask_tensor, label_t
+            return img_tensor, global_tensor, label_t
 
 
 if __name__ == "__main__":
+    # Test Block
     train_transform = A.Compose(
         [
             A.Resize(224, 224),
@@ -260,10 +295,4 @@ if __name__ == "__main__":
             ToTensorV2(),
         ]
     )
-    val_transform = A.Compose(
-        [
-            A.Resize(224, 224),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+    pass

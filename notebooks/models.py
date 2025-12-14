@@ -335,7 +335,7 @@ class TransMIL(nn.Module):
             dropout=dropout,
             activation="gelu",
             batch_first=True,
-            norm_first=True,  # Pre-norm for better training stability
+            norm_first=True,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
@@ -478,14 +478,18 @@ class SimpleCNN(nn.Module):
 
 class PathologyModel(L.LightningModule):
     """
-    Lightning Module for pathology image classification with Dual-Stream support.
-    Stream 1: Deep Backbone (RGB)
-    Stream 2: Simple CNN (Mask)
+    Lightning Module for pathology image classification with Global-Local Architecture.
+
+    Streams:
+    1. Local Stream: High-res patches (Bag of Instances) -> MIL Aggregation
+    2. Global Stream: Downsampled whole-slide/ROI -> Standard CNN
+    3. (Optional) Mask Stream: Binary mask features fused into Local Stream
     """
 
     def __init__(
         self,
         model_name: str = "resnet50",
+        global_model_name: str = "resnet18",  # Lighter backbone for global view
         num_classes: int = 4,
         pretrained: bool = True,
         learning_rate: float = 1e-4,
@@ -499,7 +503,8 @@ class PathologyModel(L.LightningModule):
         warmup_epochs: int = 5,
         freeze_backbone_epochs: int = 0,
         mixup_alpha: float = 0.0,
-        use_dual_stream: bool = False,
+        use_dual_stream: bool = False,  # Keeps mask functionality
+        drop_path_rate: float = 0.2,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["class_weights"])
@@ -517,6 +522,7 @@ class PathologyModel(L.LightningModule):
         self.freeze_backbone_epochs = freeze_backbone_epochs
         self.mixup_alpha = mixup_alpha
         self.use_dual_stream = use_dual_stream
+        self.drop_path_rate = drop_path_rate
 
         # Validate optimizer
         valid_optimizers = ["adamw", "lion", "ranger"]
@@ -526,63 +532,148 @@ class PathologyModel(L.LightningModule):
         if self.optimizer_name == "lion" and Lion is None:
             raise ImportError("Lion optimizer requires lion-pytorch package.")
 
-        self._build_model(model_name, pretrained, dropout_rate)
+        self._build_model(
+            model_name, global_model_name, pretrained, dropout_rate, drop_path_rate
+        )
         self._setup_loss()
         self._setup_metrics()
 
         if freeze_backbone_epochs > 0:
             self._freeze_backbone()
 
-    def _build_model(self, model_name: str, pretrained: bool, dropout_rate: float):
-        """Build the model architecture."""
-
-        # --- STREAM 1: RGB Image (Deep Backbone) ---
-        self.backbone = timm.create_model(
-            model_name, pretrained=pretrained, num_classes=0, drop_rate=0.0, in_chans=3
+    def _build_model(
+        self,
+        model_name: str,
+        global_model_name: str,
+        pretrained: bool,
+        dropout_rate: float,
+        drop_path_rate: float,  # NEW ARGUMENT
+    ):
+        # --- STREAM 1: LOCAL (High-Res Patches) ---
+        # FIX 1: Add Stochastic Depth (drop_path_rate) and global pool
+        self.local_backbone = timm.create_model(
+            model_name,
+            pretrained=pretrained,
+            num_classes=0,
+            drop_rate=0.0,  # Keep 0 here, we use bottleneck dropout instead
+            drop_path_rate=drop_path_rate,  # Critical for regularization
+            in_chans=3,
+            global_pool="",  # We handle pooling/flattening manually
         )
-        self.feature_dim = self.backbone.num_features
+        self.local_feature_dim_raw = self.local_backbone.num_features
 
-        # --- STREAM 2: Mask (Simple CNN) ---
+        # FIX 2: Local Bottleneck
+        # Compress 2048 (ResNet50) -> 256 to force feature selection
+        self.local_bottleneck = nn.Sequential(
+            nn.Linear(self.local_feature_dim_raw, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+        )
+        self.local_feature_dim = 256  # Updated dim
+
+        # Optional Mask Fusion
         if self.use_dual_stream:
-            # Simple CNN outputting 128 features
-            mask_out_dim = 128
+            mask_out_dim = 64  # Reduced from 128
             self.mask_backbone = SimpleCNN(
-                in_chans=1, base_filters=32, output_dim=mask_out_dim
+                in_chans=1, base_filters=16, output_dim=mask_out_dim
             )
+            self.local_feature_dim += mask_out_dim
 
-            # Fusion: Concatenation (RGB features + Mask features)
-            self.feature_dim += mask_out_dim
+        # --- STREAM 2: GLOBAL (Context) ---
+        self.global_backbone = timm.create_model(
+            global_model_name,
+            pretrained=pretrained,
+            num_classes=0,
+            drop_rate=0.0,
+            drop_path_rate=drop_path_rate,
+            in_chans=3,
+        )
 
-        # Build aggregation module for patches
+        # FIX 3: Global Bottleneck
+        # Compress 512 (ResNet18) -> 128
+        self.global_bottleneck = nn.Sequential(
+            nn.Linear(self.global_backbone.num_features, 128),
+            nn.LayerNorm(128),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+        )
+        self.global_feature_dim = 128
+
+        # --- AGGREGATION ---
         if self.use_patches:
             self.aggregation = self._build_aggregation_module()
         else:
             self.aggregation = None
 
-        # Build classifier head
+        # --- CLASSIFIER ---
+        # Input is now significantly smaller: 256 (Local) + 128 (Global) = 384
+        self.total_feature_dim = self.local_feature_dim + self.global_feature_dim
+
         self.classifier = nn.Sequential(
-            nn.LayerNorm(self.feature_dim),
-            nn.Dropout(p=dropout_rate),
-            nn.Linear(self.feature_dim, self.feature_dim // 2),
+            nn.Linear(self.total_feature_dim, self.total_feature_dim // 2),
             nn.GELU(),
-            nn.LayerNorm(self.feature_dim // 2),
-            nn.Dropout(p=dropout_rate / 2),
-            nn.Linear(self.feature_dim // 2, self.num_classes),
+            nn.Dropout(dropout_rate),  # Aggressive dropout
+            nn.Linear(self.total_feature_dim // 2, self.num_classes),
         )
 
+    def forward(self, x_local, x_global, mask=None):
+        # --- 1. Process Global Stream ---
+        global_raw = self.global_backbone(x_global)
+        global_feat = self.global_bottleneck(global_raw)  # Apply bottleneck
+
+        # --- 2. Process Local Stream ---
+        batch_size, num_patches, c, h, w = x_local.shape
+        x_local_flat = x_local.view(batch_size * num_patches, c, h, w)
+
+        # Extract features
+        local_raw = self.local_backbone(x_local_flat)
+
+        # Apply Global Average Pooling if the backbone output is spatial (e.g. ResNet)
+        if len(local_raw.shape) == 4:
+            local_raw = F.adaptive_avg_pool2d(local_raw, (1, 1)).flatten(1)
+
+        # Apply Bottleneck immediately after backbone
+        local_feat = self.local_bottleneck(local_raw)
+
+        # Optional: Mask Fusion
+        if self.use_dual_stream:
+            if mask is None:
+                raise ValueError("Mask is None")
+            mask_flat = mask.view(batch_size * num_patches, 1, h, w)
+            mask_feat = self.mask_backbone(mask_flat)
+            local_feat = torch.cat([local_feat, mask_feat], dim=1)
+
+        # Reshape back to bag
+        local_feat = local_feat.view(batch_size, num_patches, -1)
+
+        # --- 3. Aggregate Local Stream ---
+        if self.patch_aggregation == "mean":
+            local_agg = local_feat.mean(dim=1)
+        elif self.patch_aggregation == "max":
+            local_agg = local_feat.max(dim=1)[0]
+        else:
+            local_agg = self.aggregation(local_feat)
+
+        # --- 4. Fusion & Classify ---
+        fused_feat = torch.cat([local_agg, global_feat], dim=1)
+        logits = self.classifier(fused_feat)
+        return logits
+
     def _build_aggregation_module(self) -> Optional[nn.Module]:
+        # Uses local_feature_dim because aggregation happens BEFORE fusion with global
         if self.patch_aggregation in ["mean", "max"]:
             return None
         elif self.patch_aggregation == "attention":
-            return SimpleAttention(self.feature_dim)
+            return SimpleAttention(self.local_feature_dim)
         elif self.patch_aggregation == "gated_attention":
-            return GatedAttention(self.feature_dim)
+            return GatedAttention(self.local_feature_dim)
         elif self.patch_aggregation == "clam":
-            return CLAMAttention(self.feature_dim, num_classes=self.num_classes)
+            return CLAMAttention(self.local_feature_dim, num_classes=self.num_classes)
         elif self.patch_aggregation == "transmil":
-            return TransMIL(self.feature_dim)
+            return TransMIL(self.local_feature_dim)
         elif self.patch_aggregation == "multihead":
-            return MultiHeadAttentionMIL(self.feature_dim)
+            return MultiHeadAttentionMIL(self.local_feature_dim)
         else:
             raise ValueError(f"Unknown aggregation: {self.patch_aggregation}")
 
@@ -604,142 +695,77 @@ class PathologyModel(L.LightningModule):
         self.test_confmat = ConfusionMatrix(**metric_kwargs)
 
     def _freeze_backbone(self):
-        # Only freeze the pretrained RGB backbone, usually we keep training the custom SimpleCNN
-        for param in self.backbone.parameters():
+        for param in self.local_backbone.parameters():
             param.requires_grad = False
-        print(f"RGB Backbone frozen for {self.freeze_backbone_epochs} epochs")
+        for param in self.global_backbone.parameters():
+            param.requires_grad = False
+        print(f"Backbones frozen for {self.freeze_backbone_epochs} epochs")
 
     def _unfreeze_backbone(self):
-        for param in self.backbone.parameters():
+        for param in self.local_backbone.parameters():
             param.requires_grad = True
-        print("RGB Backbone unfrozen")
+        for param in self.global_backbone.parameters():
+            param.requires_grad = True
+        print("Backbones unfrozen")
 
-    def _apply_mixup(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor], y: torch.Tensor
-    ):
-        if self.mixup_alpha > 0:
-            lam = np.random.beta(self.mixup_alpha, self.mixup_alpha)
-        else:
-            lam = 1.0
+    def _apply_mixup(self, x_local, x_global, mask, y):
+        """Helper to apply mixup to dual-stream inputs."""
+        batch_size = x_local.size(0)
+        lam = np.random.beta(self.mixup_alpha, self.mixup_alpha)
+        index = torch.randperm(batch_size).to(x_local.device)
 
-        batch_size = x.size(0)
-        index = torch.randperm(batch_size, device=x.device)
+        # Mixup Local Patches
+        mixed_x_local = lam * x_local + (1 - lam) * x_local[index, :]
 
-        mixed_x = lam * x + (1 - lam) * x[index]
+        # Mixup Global Image
+        mixed_x_global = lam * x_global + (1 - lam) * x_global[index, :]
 
+        # Mixup Mask (Optional)
         mixed_mask = None
         if mask is not None:
-            mixed_mask = lam * mask + (1 - lam) * mask[index]
+            mixed_mask = lam * mask + (1 - lam) * mask[index, :]
 
-        target_a, target_b = y, y[index]
-        return mixed_x, mixed_mask, target_a, target_b, lam
-
-    def _forward_single(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        features = self.backbone(x)
-
-        if self.use_dual_stream:
-            if mask is None:
-                raise ValueError("Dual stream active but mask is None")
-            mask_features = self.mask_backbone(mask)
-            features = torch.cat([features, mask_features], dim=1)
-
-        return features
-
-    def _forward_patches(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        batch_size, num_patches, c, h, w = x.shape
-
-        # 1. RGB Processing
-        x_flat = x.view(batch_size * num_patches, c, h, w)
-        rgb_feat = self.backbone(x_flat)
-
-        # 2. Mask Processing (Simple CNN)
-        if self.use_dual_stream:
-            if mask is None:
-                raise ValueError("Dual stream active but mask is None")
-
-            mask_flat = mask.view(batch_size * num_patches, 1, h, w)
-            mask_feat = self.mask_backbone(mask_flat)
-
-            # Late Fusion
-            features = torch.cat([rgb_feat, mask_feat], dim=1)
-        else:
-            features = rgb_feat
-
-        # 3. Reshape and Aggregate
-        features = features.view(batch_size, num_patches, -1)
-        features = self._aggregate_patches(features)
-
-        return features
-
-    def _aggregate_patches(self, features: torch.Tensor) -> torch.Tensor:
-        if self.patch_aggregation == "mean":
-            return features.mean(dim=1)
-        elif self.patch_aggregation == "max":
-            return features.max(dim=1)[0]
-        else:
-            return self.aggregation(features)
-
-    def forward(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        is_patches = x.dim() == 5
-
-        if self.use_dual_stream and mask is None:
-            raise ValueError("Dual stream requires mask input.")
-
-        if is_patches:
-            features = self._forward_patches(x, mask)
-        else:
-            features = self._forward_single(x, mask)
-
-        logits = self.classifier(features)
-        return logits
+        # Targets
+        y_a, y_b = y, y[index]
+        return mixed_x_local, mixed_x_global, mixed_mask, y_a, y_b, lam
 
     def training_step(self, batch: Tuple, batch_idx: int) -> torch.Tensor:
         if self.use_dual_stream:
-            x, mask, y = batch
+            x_local, x_global, mask, y = batch
         else:
-            x, y = batch
+            x_local, x_global, y = batch
             mask = None
 
-        if self.mixup_alpha > 0:
-            mixed_x, mixed_mask, target_a, target_b, lam = self._apply_mixup(x, mask, y)
-            logits = self(mixed_x, mixed_mask)
-            loss = lam * self.criterion(logits, target_a) + (1 - lam) * self.criterion(
-                logits, target_b
+        if self.mixup_alpha > 0 and self.current_epoch < self.trainer.max_epochs - 5:
+            x_local, x_global, mask, y_a, y_b, lam = self._apply_mixup(
+                x_local, x_global, mask, y
+            )
+            logits = self(x_local, x_global, mask)
+            loss = lam * self.criterion(logits, y_a) + (1 - lam) * self.criterion(
+                logits, y_b
+            )
+        else:
+            logits = self(x_local, x_global, mask)
+            loss = self.criterion(logits, y)
+
+        preds = torch.argmax(logits, dim=1)
+        if self.mixup_alpha == 0:
+            self.train_acc(preds, y)
+            self.log(
+                "train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True
             )
 
-            # Metric logging
-            target_metric = target_a if lam >= 0.5 else target_b
-            preds = torch.argmax(logits, dim=1)
-            self.train_acc(preds, target_metric)
-            self.train_f1(preds, target_metric)
-        else:
-            logits = self(x, mask)
-            loss = self.criterion(logits, y)
-            preds = torch.argmax(logits, dim=1)
-            self.train_acc(preds, y)
-            self.train_f1(preds, y)
-
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log(
-            "train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True
-        )
-        self.log("train/f1", self.train_f1, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch: Tuple, batch_idx: int):
         if self.use_dual_stream:
-            x, mask, y = batch
+            x_local, x_global, mask, y = batch
         else:
-            x, y = batch
+            x_local, x_global, y = batch
             mask = None
 
-        logits = self(x, mask)
+        logits = self(x_local, x_global, mask)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         probs = F.softmax(logits, dim=1)
@@ -747,19 +773,19 @@ class PathologyModel(L.LightningModule):
         self.val_acc(preds, y)
         self.val_f1(preds, y)
         self.val_auroc(probs, y)
+
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/f1", self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/auroc", self.val_auroc, on_step=False, on_epoch=True)
+        self.log("val/f1", self.val_f1, on_step=False, on_epoch=True)
 
     def test_step(self, batch: Tuple, batch_idx: int):
         if self.use_dual_stream:
-            x, mask, y = batch
+            x_local, x_global, mask, y = batch
         else:
-            x, y = batch
+            x_local, x_global, y = batch
             mask = None
 
-        logits = self(x, mask)
+        logits = self(x_local, x_global, mask)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         probs = F.softmax(logits, dim=1)
@@ -768,41 +794,63 @@ class PathologyModel(L.LightningModule):
         self.test_f1(preds, y)
         self.test_auroc(probs, y)
         self.test_confmat(preds, y)
+
         self.log("test/loss", loss)
         self.log("test/acc", self.test_acc)
         self.log("test/f1", self.test_f1)
         self.log("test/auroc", self.test_auroc)
 
     def predict_step(self, batch: Tuple, batch_idx: int) -> Dict[str, Any]:
+        """
+        Prediction step with Test-Time Augmentation (TTA).
+        Applies TTA (Flips/Rotations) to Local Patches, Global Image, and Mask.
+        """
+        # Unpack batch based on configuration
         if self.use_dual_stream:
-            x, mask, sample_ids = batch
+            # batch structure: (patches, global_img, mask, sample_ids)
+            x_local, x_global, mask, sample_ids = batch
         else:
-            x, sample_ids = batch
+            # batch structure: (patches, global_img, sample_ids)
+            x_local, x_global, sample_ids = batch
             mask = None
 
-        spatial_dims = [-2, -1]
+        spatial_dims = [-2, -1]  # H, W dimensions for both patches and global image
+
+        # TTA Augmentations: Tuple of (Local, Global, Mask) -> (Local, Global, Mask)
         augmentations = [
-            lambda t, m: (t, m),
-            lambda t, m: (
-                torch.flip(t, dims=[-1]),
+            # 1. Identity (No transform)
+            lambda l, g, m: (l, g, m),
+            # 2. Horizontal Flip
+            lambda l, g, m: (
+                torch.flip(l, dims=[-1]),
+                torch.flip(g, dims=[-1]),
                 torch.flip(m, dims=[-1]) if m is not None else None,
             ),
-            lambda t, m: (
-                torch.flip(t, dims=[-2]),
+            # 3. Vertical Flip
+            lambda l, g, m: (
+                torch.flip(l, dims=[-2]),
+                torch.flip(g, dims=[-2]),
                 torch.flip(m, dims=[-2]) if m is not None else None,
             ),
-            lambda t, m: (
-                torch.rot90(t, k=1, dims=spatial_dims),
+            # 4. Rotate 90 degrees
+            lambda l, g, m: (
+                torch.rot90(l, k=1, dims=spatial_dims),
+                torch.rot90(g, k=1, dims=spatial_dims),
                 torch.rot90(m, k=1, dims=spatial_dims) if m is not None else None,
             ),
         ]
 
         logits_sum = 0
+
+        # Apply every augmentation and aggregate logits
         for aug_func in augmentations:
-            aug_x, aug_mask = aug_func(x, mask)
-            logits = self(aug_x, aug_mask)
+            aug_local, aug_global, aug_mask = aug_func(x_local, x_global, mask)
+
+            # Forward pass with augmented views
+            logits = self(aug_local, aug_global, aug_mask)
             logits_sum += logits
 
+        # Average logits across augmentations
         avg_logits = logits_sum / len(augmentations)
         probs = F.softmax(avg_logits, dim=1)
         preds = torch.argmax(avg_logits, dim=1)
@@ -810,15 +858,14 @@ class PathologyModel(L.LightningModule):
         return {"sample_ids": sample_ids, "predictions": preds, "probabilities": probs}
 
     def configure_optimizers(self) -> Dict[str, Any]:
-        # RGB Backbone Params
-        backbone_params = list(self.backbone.parameters())
+        # Separate parameter groups for possibly different LRs
+        backbone_params = list(self.local_backbone.parameters()) + list(
+            self.global_backbone.parameters()
+        )
 
-        # Classifier & Aggregation Params
         classifier_params = list(self.classifier.parameters())
         if self.aggregation is not None:
             classifier_params += list(self.aggregation.parameters())
-
-        # Mask CNN Params (Always treat as part of 'classifier' group or its own group with higher LR)
         if self.use_dual_stream:
             classifier_params += list(self.mask_backbone.parameters())
 

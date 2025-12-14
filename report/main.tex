@@ -55,24 +55,19 @@
 
 \begin{multicols}{2}
     \section{Introduction}
-    In this section, you should present your project's context and objectives. You might want to:
-    \begin{itemize}
-        \item Define the problem (\textit{you may use italics to highlight definitions})
-        \item State your goals (\textbf{emphasise key points with bold})
-        \item Outline your approach
-    \end{itemize}
-
-    \noindent For instance, you might write: ``This project focuses on \textit{image classification} using \textbf{deep learning} techniques."
-
+    Regarding this four-class image classification problem, we employs a patch-based approach where images are subdivided into smaller regions. These patches are processed using \textbf{Multiple Instance Learning (MIL)} aggregation techniques to produce a slide-level prediction.
     \section{Problem Analysis}
-    Here you can discuss your initial analysis of the problem. Consider including:
-    \begin{enumerate}
-        \item Dataset characteristics
-        \item Main challenges
-        \item Initial assumptions
-    \end{enumerate}
+    The dataset consists of pathology images categorized into four subtypes: \textbf{Luminal A, Luminal B, HER2(+), and Triple negative}, includes 690 training images and their mask files.
 
-    \noindent If you need to reference papers, use the citation command: Recent work~\cite{lecun2015deep} suggests..."
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.75\linewidth]{class-distribution.png}
+        \caption{The distribution of classes in the dataset}
+    \end{figure}
+
+    \noindent The dataset exhibits class imbalance, with the \textbf{Luminal B} subtype being the most prevalent, \textbf{Triple negative} subtypes are underrepresented.
+
+    We are trying to extract multiple patches from each high-resolution pathology image.
 
     \section{Method}
     This section should detail your approach. You can use equations to explain your methodology. For example, a simple model representation:

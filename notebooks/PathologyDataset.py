@@ -82,7 +82,6 @@ class PathologyDataset(Dataset):
             )
 
         # 2. Setup Global Transform (Context)
-        # Always resize to img_size and Normalize
         self.global_transform = A.Compose(
             [
                 A.Resize(self.img_size, self.img_size),
@@ -282,7 +281,6 @@ class PathologyDataset(Dataset):
 
 
 if __name__ == "__main__":
-    # Test Block
     train_transform = A.Compose(
         [
             A.Resize(224, 224),

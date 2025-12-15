@@ -16,8 +16,6 @@ class Lookahead(torch.optim.Optimizer):
 
     Wraps any optimizer and maintains slow weights that are updated
     by interpolating towards fast weights every k steps.
-
-    Reference: https://arxiv.org/abs/1907.08610
     """
 
     def __init__(self, base_optimizer, k: int = 6, alpha: float = 0.5):
@@ -78,12 +76,7 @@ class Lookahead(torch.optim.Optimizer):
 
 class RAdam(torch.optim.Optimizer):
     """
-    RAdam optimizer (Liu et al. 2019).
-
-    Rectified Adam - automatically adjusts adaptive learning rate
-    based on variance of second moment estimate.
-
-    Reference: https://arxiv.org/abs/1908.03265
+    RAdam optimizer
     """
 
     def __init__(
@@ -225,8 +218,7 @@ class SimpleAttention(nn.Module):
 
 class GatedAttention(nn.Module):
     """
-    Gated Attention Mechanism (Ilse et al. 2018)
-    Paper: https://arxiv.org/abs/1802.04712
+    Gated Attention Mechanism
     """
 
     def __init__(self, feature_dim: int, hidden_dim: int = 256, dropout: float = 0.25):
@@ -299,9 +291,6 @@ class CLAMAttention(nn.Module):
 
 class TransMIL(nn.Module):
     """
-    Transformer-based Multiple Instance Learning (Shao et al. 2021)
-    Paper: https://arxiv.org/abs/2106.00908
-
     Uses transformer encoder with learnable class token for aggregation.
     """
 
@@ -506,6 +495,26 @@ class PathologyModel(L.LightningModule):
         use_dual_stream: bool = False,  # Keeps mask functionality
         drop_path_rate: float = 0.2,
     ):
+        """
+        Args:
+            model_name: Backbone for local stream (patches)
+            global_model_name: Backbone for global stream (downsampled image)
+            num_classes: Number of output classes
+            pretrained: Use ImageNet pre-trained weights
+            learning_rate: Initial learning rate
+            weight_decay: Weight decay for optimizer
+            use_patches: Whether to use patch-based local stream
+            patch_aggregation: MIL aggregation method for local stream ("mean", "max", "attention", "gated_attention", "clam", "transmil", "multihead")
+            optimizer_name: Optimizer to use ("adamw", "lion", "ranger")
+            dropout_rate: Dropout rate for regularization
+            label_smoothing: Label smoothing factor for loss
+            class_weights: Class weights for handling imbalance
+            warmup_epochs: Number of warmup epochs for LR scheduler
+            freeze_backbone_epochs: Epochs to freeze backbone at start
+            mixup_alpha: Alpha parameter for Mixup augmentation
+            use_dual_stream: Whether to use dual stream with mask input
+            drop_path_rate: Stochastic depth rate for regularization
+        """
         super().__init__()
         self.save_hyperparameters(ignore=["class_weights"])
 

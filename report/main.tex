@@ -58,28 +58,28 @@
     \section{Introduction}
     Regarding this four-class image classification problem, we employs a patch-based approach where images are subdivided into smaller regions. These patches are processed using \textbf{Multiple Instance Learning (MIL)} aggregation techniques to produce a slide-level prediction.
     \section{Problem Analysis}
-    The dataset consists of pathology images categorized into four subtypes: \textbf{Luminal A, Luminal B, HER2(+), and Triple negative}, includes 691 training images and their mask files.
+    The dataset comprises 691 pathology images coupled with pixel-level annotation masks. The samples are categorized into four molecular subtypes: \textbf{Luminal A (30\%)}, \textbf{Luminal B (32\%)}, \textbf{HER2(+) (27\%)}, and \textbf{Triple Negative (11\%)}. As indicated by these statistics, the dataset exhibits significant \textbf{class imbalance}, with \textbf{Luminal B} being the most prevalent and \textbf{Triple Negative} being underrepresented.
 
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=0.75\linewidth]{class-distribution.png}
-        \caption{The distribution of classes in the dataset}
-    \end{figure}
+    For feature extraction, we extract patches from annotated regions to form MIL bags (see Figures~\ref{fig:patches_example1} and~\ref{fig:patches_example2}). However, limited mask coverage in some images results in sparse bags, which risks overfitting.
 
-    \noindent The dataset exhibits class imbalance, with the \textbf{Luminal B} subtype being the most prevalent, \textbf{Triple negative} subtypes are underrepresented.
-
-    We extract multiple patches from a pathology image.
+    To address this, we expanded our sampling criteria:
+    \begin{enumerate}
+        \item \textbf{Boundary Inclusion:} We extract patches from the mask periphery to increase bag size and capture contextual information.
+        \item \textbf{Normal Tissue Padding:} If the patch count remains insufficient, we supplement the bag with normal tissue patches. This ensures consistent bag sizes and helps the model distinguish tumor features from the background.
+    \end{enumerate}
 
     \begin{figure}[H]
         \centering
         \includegraphics[width=1.0\linewidth]{patches_example1.png}
         \caption{Example of extracted patches from a pathology image (0000)}
+        \label{fig:patches_example1}
     \end{figure}
 
     \begin{figure}[H]
         \centering
         \includegraphics[width=1.0\linewidth]{patches_example2.png}
         \caption{Example of extracted patches from a pathology image (0002)}
+        \label{fig:patches_example2}
     \end{figure}
 
     \section{Method}
@@ -92,15 +92,10 @@
     Finally, we removed \textbf{101} noisy images from the training set, get \textbf{590} clean images for training.
 
     \subsection{Data Augmentation}
-    To enhance model robustness and generalization, we applied various data augmentation techniques during training, including
-    \begin{itemize}
-        \item Random rotations and flips
-        \item Color jittering (brightness, contrast, saturation adjustments)
-        \item Mixup augmentation
-    \end{itemize}
+    We utilized the \textbf{ImageNet AutoAugment policy} to align with our backbone's pre-training on the ImageNet dataset. This facilitates effective transfer learning by ensuring input variations remain compatible with the pre-trained weights, while introducing diverse regularization (e.g., geometric and color shifts) to prevent overfitting on the limited pathology data.
 
     \subsection{Dual-stream MIL Network}
-    We use a Dual-Stream Multiple Instance Learning (MIL) architecture ~\cite{li_dual-stream_2021} designed to integrate local morphological details with global spatial context. As illustrated in ~\ref{fig:dual_stream_mil}, the network processes a image through two parallel streams: a \textit{Local Stream} (Bag of Instances) and a \textit{Global Stream} (Contextual View), fusing their representations for final classification.
+    We employ a Dual-Stream Multiple Instance Learning (MIL) architecture~\cite{li_dual-stream_2021} to synergize local morphological details with global spatial context. As illustrated in Figure~\ref{fig:dual_stream_mil}, the framework operates via two parallel pathways: a \textit{Local Stream} (Bag of Instances) and a \textit{Global Stream} (Contextual View), which are fused for final classification.
 
     \begin{figure}[H]
         \centering
@@ -110,24 +105,28 @@
     \end{figure}
 
     \paragraph{Local Stream}
-    The local stream processes individual patches extracted from the image. Each patch is passed through a shared backbone network (ResNet34) to extract feature representations. These features are then projected into a lower-dimensional space via a bottleneck layer.
+    This stream processes the bag of extracted patches. A shared backbone extracts feature embeddings from each instance, which are subsequently projected into a lower-dimensional space via a bottleneck layer.
 
     \paragraph{Optional Mask Fusion}
-    Since the binary mask is provided, we experimented with fusing mask information into the patch features.
+    To leverage the available segmentation annotations, we integrate an optional mask fusion step. Binary mask information is concatenated with patch embeddings to explicitly guide the network toward relevant pathological regions.
 
     \paragraph{MIL Aggregation}
-    To obtain a permutation-invariant representation of the entire bag, we employ an aggregation function.
+    We apply a permutation-invariant aggregation function to the instance embeddings. This synthesizes the varying number of patch features into a fixed-length, slide-level representation.
 
     \paragraph{Global Stream}
-    To capture macro-architectural patterns often lost in patch-based tiling, we introduce a global stream. A downsampled view of the image is processed by a secondary backbone (ResNet18). Similar to the local stream, this is projected via a bottleneck.
-    \pagebreak
+    To capture macro-architectural patterns often lost during tiling, the global stream processes a downsampled view of the entire image using a backbone. Similar to the local stream, these global features are compressed via a bottleneck projection before fusion.
 
     \section{Experiments}
-    We conducted extensive experiments to evaluate the performance of our proposed Dual-Stream MIL model. The experiments were designed to assess the impact of various components, including the use of mask information, different aggregation methods, and data augmentation techniques.
+    We conducted extensive experiments to evaluate the Dual-Stream MIL model, assessing the impact of patch selection, aggregation strategies, and backbones.
+
     \paragraph{Patch Extraction}
-    We extracted patches of size 224x224 pixels from each image using a stride of 112 pixels. Patches with less than 50\% tissue content were discarded based on the provided binary masks. To avoid class imbalance, we ensured that each bag contained a balanced number of patches from each class using WeightedRandomSampler.
+    Patches of $224 \times 224$ pixels were extracted with a stride of 112. Using the binary masks, we discarded patches containing less than 50\% tissue. To handle class imbalance during training, we utilized a \textbf{WeightedRandomSampler}. Empirically, we determined that a bag size of approximately 8 patches offered the optimal trade-off between computational efficiency and representational power.
+
+    \paragraph{Aggregation Method}
+    We benchmarked various MIL aggregation techniques, including Max Pooling, Mean Pooling, Attention-based Pooling, Gated Attention, TransMIL, and \textbf{CLAM} (Clustering-constrained Attention Multiple instance learning). We found that \textbf{CLAM} yielded the best performance, effectively learning instance-level importance to refine slide-level predictions.
+
     \paragraph{Optimizer}
-    We used the AdamW optimizer with a learning rate of 1e-4 and weight decay of 1e-2. We also expored the Lion optimizer.
+    Training was performed using the \textbf{AdamW} optimizer with a learning rate of $1 \times 10^{-4}$ and weight decay of $1 \times 10^{-2}$. We also explored the \textbf{Lion} optimizer but observed more stable convergence with AdamW.
 
 
     \begin{table}[H]
@@ -151,14 +150,71 @@
     \end{table}
 
     \section{Discussion}
+    Our experiments demonstrate that the architectural choice for the Local and Global streams significantly impacts performance. As shown in Table~\ref{tb:Measurements}, the combination of \textbf{ConvNeXt-Tiny} (Local) and \textbf{ResNet-18} (Global) yielded the highest F1-score of \textbf{0.4226}, outperforming other configurations. For the model selection throughout the entire experimental process, please refer to the ~\ref{sec:appendix}.
 
+    We attribute this success to two main factors. First, ConvNeXt designs modernize the standard ResNet architecture with depth-wise convolutions and larger kernels, allowing it to capture more robust morphological features from local patches without a massive increase in parameters. Second, the use of a lightweight \textbf{ResNet-18} for the global stream proved sufficient for capturing macro-spatial context without overfitting.
 
-    \section{Suggest improvements}
+    Notably, larger backbones such as \textbf{ResNet-50} performed poorly (0.3116 F1-score). Given the limited size of our clean training set (590 images), deeper models likely suffered from severe overfitting, failing to generalize to the validation set. This confirms that for small-scale histology datasets, model compactness and inductive bias (as seen in ConvNeXt) are more critical than raw model depth.
 
+    \section{Future Improvements}
+    We propose the following strategies:
 
+    \begin{itemize}
+        \item \textbf{Contrastive Representation Learning:} Rather than relying solely on ImageNet weights, we propose using self-supervised contrastive frameworks (e.g., SimCLR or MoCo) on the pathology patches. This would allow the backbone to learn invariant tissue representations by pulling similar features together and pushing dissimilar ones apart before classification begins.
 
+        \item \textbf{Generative Data Synthesis:} To overcome the limited dataset size, we could employ conditional Generative Adversarial Networks (cGANs) or Diffusion models conditioned on the segmentation masks. This would allow us to "synthesize" new, realistic training images with diverse textures while preserving the original morphological structures.
+    \end{itemize}
     \bibliography{references}
     \bibliographystyle{abbrv}
-
 \end{multicols}
+\appendix
+\section{Appendix: Full Process Experimental Results}\label{sec:appendix}
+\begin{table*}[h]
+    \centering
+    \setlength{\tabcolsep}{3pt}
+    \caption{Starting from a \textbf{simple CNN model}, we use the resized images as input directly.}
+    \begin{tabularx}{\textwidth}{lYYY}
+        \toprule
+        Model                 & F1-score in validation & Note                                                                   \\
+        \midrule
+        Simple CNN (4 layers) & 0.2759                 & Simple CNN is hard to learn since limited dataset.                     \\
+        ResNet18              & 0.3090                 & Severe underfitting, loss oscillates severely.                         \\
+        ResNet50              & 0.3250                 & Similar to ResNet18 but slightly better.                               \\
+        EfficientNet\_b0      & 0.3014                 & Less parameters, faster but still bad fit                              \\
+        ConvNeXt\_tiny        & 0.3322                 & Severe overfitting, but the effect has improved, consider work on data \\
+        \bottomrule
+    \end{tabularx}
+\end{table*}
+
+\begin{table*}[h]
+    \centering
+    \setlength{\tabcolsep}{3pt}
+    \caption{Use \textbf{multi-instance learning (MIL)} with extracted patches as input.}
+    \begin{tabularx}{\textwidth}{lYYYY}
+        \toprule
+        Model          & patch size * number & aggregation & F1-score in validation & Note                                           \\
+        \midrule
+        ConvNeXt\_tiny & 64*8                & Max Pooling & 0.3412                 & Simple MIL, better than using whole image      \\
+        ConvNeXt\_tiny & 64*16               & attention   & 0.3630                 & Larger patch size improves performance         \\
+        ConvNeXt\_tiny & 224*8               & clam        & 0.3907                 & No resize for model input, 224 could be better \\
+        ConvNeXt\_tiny & 224*16              & ---         & ---                    & CUDA out of memory                             \\
+        \bottomrule
+    \end{tabularx}
+\end{table*}
+
+\begin{table}[H]
+    \centering
+    \setlength{\tabcolsep}{3pt}
+    \caption{Use dual stream, put the mask into the local stream.}
+    \begin{tabularx}{\linewidth}{lYY}
+        \toprule
+        Model(local + global)         & F1-score in validation & Note                                                     \\
+        \midrule
+        convnext\_tiny+resnet18       & 0.4623                 & Get the highest score, but normal (0.4008) in submission \\
+        convnext\_tiny+convnext\_tiny & 0.4319                 & Severe overfitting! Global stream is too strong          \\
+        resnet18+resnet18             & 0.3674                 & Loss extreme  volatility, model is hard to learn         \\
+
+        \bottomrule
+    \end{tabularx}
+\end{table}
 \end{document}

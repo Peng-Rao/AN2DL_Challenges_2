@@ -263,7 +263,7 @@ class CLAMAttention(nn.Module):
         feature_dim: int,
         hidden_dim: int = 256,
         dropout: float = 0.25,
-        num_classes: int = 4,  # kept for API compatibility but not used
+        num_classes: int = 4,
     ):
         super().__init__()
 
@@ -556,7 +556,7 @@ class PathologyModel(L.LightningModule):
             pretrained=pretrained,
             num_classes=0,
             drop_rate=0.0,  # Keep 0 here, we use bottleneck dropout instead
-            drop_path_rate=drop_path_rate,  # Critical for regularization
+            # drop_path_rate=drop_path_rate,  # Critical for regularization
             in_chans=3,
             global_pool="",  # We handle pooling/flattening manually
         )
@@ -586,11 +586,10 @@ class PathologyModel(L.LightningModule):
             pretrained=pretrained,
             num_classes=0,
             drop_rate=0.0,
-            drop_path_rate=drop_path_rate,
+            # drop_path_rate=drop_path_rate,
             in_chans=3,
         )
 
-        # FIX 3: Global Bottleneck
         # Compress 512 (ResNet18) -> 128
         self.global_bottleneck = nn.Sequential(
             nn.Linear(self.global_backbone.num_features, 128),
@@ -776,7 +775,7 @@ class PathologyModel(L.LightningModule):
 
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/f1", self.val_f1, on_step=False, on_epoch=True)
+        self.log("val/f1", self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Tuple, batch_idx: int):
         if self.use_dual_stream:
@@ -858,6 +857,7 @@ class PathologyModel(L.LightningModule):
         return {"sample_ids": sample_ids, "predictions": preds, "probabilities": probs}
 
     def configure_optimizers(self) -> Dict[str, Any]:
+        max_epochs = self.trainer.max_epochs
         # Separate parameter groups for possibly different LRs
         backbone_params = list(self.local_backbone.parameters()) + list(
             self.global_backbone.parameters()
@@ -894,17 +894,12 @@ class PathologyModel(L.LightningModule):
 
         def lr_lambda(epoch):
             if epoch < self.warmup_epochs:
-                return (epoch + 1) / self.warmup_epochs
-            return 0.5 * (
-                1
-                + torch.cos(
-                    torch.tensor(
-                        (epoch - self.warmup_epochs)
-                        / (50 - self.warmup_epochs)
-                        * 3.14159
-                    )
-                ).item()
+                return float(epoch + 1) / float(max_epochs)
+
+            progress = float(epoch - self.warmup_epochs) / float(
+                max(1, max_epochs - self.warmup_epochs)
             )
+            return 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.14159)).item())
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
         return {

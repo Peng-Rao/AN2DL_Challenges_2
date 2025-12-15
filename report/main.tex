@@ -30,7 +30,7 @@
     {\Large \textbf{AN2DL - Second Challenge Report}}\\
     \vspace{2mm}
     % Change with your Team Name
-    {\Large \textbf{Team Name}}\\
+    {\Large \textbf{AN2DL\_C}}\\
     \vspace{2mm}
     % Team Members Information
     {\large JIALI CLAUDIO HUANG,}
@@ -68,7 +68,7 @@
 
     \noindent The dataset exhibits class imbalance, with the \textbf{Luminal B} subtype being the most prevalent, \textbf{Triple negative} subtypes are underrepresented.
 
-    We are trying to extract multiple patches from a pathology image.
+    We extract multiple patches from a pathology image.
 
     \begin{figure}[H]
         \centering
@@ -100,108 +100,62 @@
     \end{itemize}
 
     \subsection{Dual-stream MIL Network}
-    We use a Dual-Stream Multiple Instance Learning (MIL) architecture designed to integrate local morphological details with global spatial context. As illustrated in ~\ref{fig:dual_stream_mil}, the network processes a image through two parallel streams: a \textit{Local Stream} (Bag of Instances) and a \textit{Global Stream} (Contextual View), fusing their representations for final classification.
+    We use a Dual-Stream Multiple Instance Learning (MIL) architecture ~\cite{li_dual-stream_2021} designed to integrate local morphological details with global spatial context. As illustrated in ~\ref{fig:dual_stream_mil}, the network processes a image through two parallel streams: a \textit{Local Stream} (Bag of Instances) and a \textit{Global Stream} (Contextual View), fusing their representations for final classification.
 
     \begin{figure}[H]
         \centering
-        \includegraphics[width=1.0\linewidth]{Dual-Stream-MIL.png}
+        \includegraphics[height=0.5\textheight]{Dual-Stream-MIL.png}
         \caption{Dual-Stream MIL Architecture}
         \label{fig:dual_stream_mil}
     \end{figure}
 
-    \paragraph{Feature Extraction}
-    Each patch $x_i$ is processed independently by a shared backbone encoder $f_\theta$ (e.g., ResNet50), yielding a raw feature vector. To reduce dimensionality and enforce feature selection, we apply a bottleneck $B_{local}$ consisting of a linear projection, LayerNorm, GELU activation, and Dropout:
+    \paragraph{Local Stream}
+    The local stream processes individual patches extracted from the image. Each patch is passed through a shared backbone network (ResNet34) to extract feature representations. These features are then projected into a lower-dimensional space via a bottleneck layer.
 
     \paragraph{Optional Mask Fusion}
-    If binary segmentation masks $m_i$ are provided, they are processed by a lightweight 4-layer CNN, $g_\phi$. The resulting mask embeddings are concatenated with the patch features:
+    Since the binary mask is provided, we experimented with fusing mask information into the patch features.
 
     \paragraph{MIL Aggregation}
-    To obtain a permutation-invariant representation of the entire bag, we employ an aggregation function $\mathcal{A}(\cdot)$. While the architecture supports CLAM and TransMIL, the general attention-based aggregation is defined as:
-    where $a_i$ represent learnable attention scores computed via a Gated Attention mechanism (Ilse et al., 2018) or a Transformer encoder, ensuring the model focuses on diagnostically relevant patches.
+    To obtain a permutation-invariant representation of the entire bag, we employ an aggregation function.
 
-    To capture macro-architectural patterns often lost in patch-based tiling, we introduce a global stream. A downsampled view of the ROI or WSI, $X_{global}$, is processed by a secondary backbone $q_\psi$ (e.g., ResNet18). Similar to the local stream, this is projected via a bottleneck $B_{global}$:
-
-    The final slide-level representation $\mathbf{Z}$ is obtained by concatenating the aggregated local features and the global context vector:
-    This fused vector is passed to a multi-layer perceptron (MLP) classifier with aggressive dropout and GELU activation to predict the class probability distribution $\hat{Y}$:
-
-    The model is trained using Cross-Entropy loss with support for Mixup augmentation and label smoothing to improve generalization.
-
+    \paragraph{Global Stream}
+    To capture macro-architectural patterns often lost in patch-based tiling, we introduce a global stream. A downsampled view of the image is processed by a secondary backbone (ResNet18). Similar to the local stream, this is projected via a bottleneck.
     \pagebreak
 
     \section{Experiments}
-    For your experiments, you might want to present your results in tables. Here's an example of a wide table comparing different models:
+    We conducted extensive experiments to evaluate the performance of our proposed Dual-Stream MIL model. The experiments were designed to assess the impact of various components, including the use of mask information, different aggregation methods, and data augmentation techniques.
+    \paragraph{Patch Extraction}
+    We extracted patches of size 224x224 pixels from each image using a stride of 112 pixels. Patches with less than 50\% tissue content were discarded based on the provided binary masks. To avoid class imbalance, we ensured that each bag contained a balanced number of patches from each class using WeightedRandomSampler.
+    \paragraph{Optimizer}
+    We used the AdamW optimizer with a learning rate of 1e-4 and weight decay of 1e-2. We also expored the Lion optimizer.
 
-    \begin{table*}[t]
-        \centering
-        \setlength{\tabcolsep}{3pt}
-        \caption{An example of wide table. Best results are highlighted in \textbf{bold}.}
-        \begin{tabularx}{\textwidth}{lYYYc}
-            \toprule
-            Model        & Accuracy                  & Precision                 & Recall                    & ROC AUC                   \\
-            \midrule
-            VGG18        & 72.20 $\pm$ 3.06          & 94.95 $\pm$ 0.52          & 86.95 $\pm$ 0.55          & 80.16 $\pm$ 0.81          \\
-            Custom Model & 27.71 $\pm$ 3.19          & 75.70 $\pm$ 1.07          & 55.75 $\pm$ 2.16          & 36.60 $\pm$ 1.26          \\
-            ResNet18     & \textbf{89.24 $\pm$ 2.38} & \textbf{95.54 $\pm$ 0.49} & \textbf{93.43 $\pm$ 1.30} & \textbf{91.68 $\pm$ 0.71} \\
-            \bottomrule
-        \end{tabularx}
-        \label{tab:Performance}
-    \end{table*}
-
-    \noindent For more specific measurements, you might use a narrower table:
 
     \begin{table}[H]
         \centering
         \setlength{\tabcolsep}{3pt}
-        \caption{An example of table. Best results may be highlighted in \textbf{bold}.}
+        \caption{Experimental measurements for different models.}
         \begin{tabularx}{\linewidth}{lY}
             \toprule
-            Time [$\mu$s] & Distance [mm] \\
+            Model(local + global)             & F1-score in validation \\
             \midrule
-            22$\pm$4      & 8$\pm$1       \\
-            17$\pm$3      & 7$\pm$1       \\
-            15$\pm$3      & 6$\pm$1       \\
-            13$\pm$2      & 5$\pm$1       \\
-            10$\pm$2      & 4$\pm$1       \\
-            8$\pm$2       & 3$\pm$1       \\
-            5$\pm$1       & 2$\pm$1       \\
-            37$\pm$1      & 1$\pm$1       \\
+            resnet18+resnet18                 & 0.3674                 \\
+            efficientnet\_b0+efficientnet\_b0 & 0.3734                 \\
+
+            densenet121+resnet18              & 0.3828                 \\
+            resnet18+convnext\_tiny           & 0.3482                 \\
+            \textbf{convnext\_tiny+resnet18}  & \textbf{0.4226}        \\
+            resnet50+resnet18                 & 0.3116                 \\
             \bottomrule
         \end{tabularx}
         \label{tb:Measurements}
     \end{table}
 
-    \noindent You can also include figures to visualise your results:
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=0.75\linewidth]{random.jpeg}
-        \caption{Example figure showing [describe what the figure shows]}
-        \label{fig:results}
-    \end{figure}
-
-    \noindent Reference figures using like:``As shown in Figure~\ref{fig:results}..."
-
-    \section{Results}
-    Present your main findings here. You might want to:
-    \begin{itemize}
-        \item Compare your results with baselines
-        \item Highlight key achievements using \textbf{bold text}
-        \item Explain any unexpected outcomes
-    \end{itemize}
-
     \section{Discussion}
-    In this section, analyse your results critically. Consider:
-    \begin{itemize}
-        \item Strengths and weaknesses
-        \item Limitations and assumptions
-    \end{itemize}
 
-    \section{Conclusions}
-    Summarise your work and discuss potential future directions. This is where you can:
-    \begin{itemize}
-        \item Restate main contributions
-        \item Suggest improvements
-        \item Propose future work
-    \end{itemize}
+
+    \section{Suggest improvements}
+
+
 
     \bibliography{references}
     \bibliographystyle{abbrv}

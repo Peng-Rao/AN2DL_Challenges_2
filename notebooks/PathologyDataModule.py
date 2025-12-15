@@ -115,7 +115,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
-                img_size=self.img_size,  # <--- Added explicit pass
+                img_size=self.img_size,
                 num_patches=self.num_patches,
                 patch_strategy="random",
                 min_annotation_pixels=self.min_annotation_pixels,
@@ -132,7 +132,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
-                img_size=self.img_size,  # <--- Added explicit pass
+                img_size=self.img_size,
                 num_patches=self.num_patches,
                 patch_strategy="grid",
                 stride=self.patch_size // 2,
@@ -151,7 +151,7 @@ class PathologyDataModule(L.LightningDataModule):
                 use_mask=self.use_mask,
                 use_patches=self.use_patches,
                 patch_size=self.patch_size,
-                img_size=self.img_size,  # <--- Added explicit pass
+                img_size=self.img_size,
                 num_patches=self.num_patches,
                 patch_strategy="grid",
                 stride=self.patch_size // 2,
